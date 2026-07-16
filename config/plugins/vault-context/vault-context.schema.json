@@ -1,0 +1,154 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://raw.githubusercontent.com/MiquelGomezCorral/vault-context/main/vault-context.schema.json",
+  "title": "vault-context configuration",
+  "description": "Configuration for the vault-context Obsidian RAG plugin for opencode.",
+  "type": "object",
+  "properties": {
+    "vault": {
+      "type": "object",
+      "properties": {
+        "path": { "type": "string", "description": "Path to Obsidian vault. Default: $HOME/Desktop/Obsidian" }
+      },
+      "additionalProperties": false
+    },
+    "mode": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "string", "enum": ["auto", "off", "force"], "description": "auto | off | force" }
+      },
+      "additionalProperties": false
+    },
+    "search": {
+      "type": "object",
+      "properties": {
+        "maxHits": { "type": "integer", "minimum": 1, "maximum": 20, "description": "Max notes to inject per message" },
+        "maxChars": { "type": "integer", "minimum": 100, "description": "Max chars per injection block" },
+        "minScore": { "type": "integer", "minimum": 0, "description": "Minimum score for a hit to be included" },
+        "rgTimeoutMs": { "type": "integer", "minimum": 100, "description": "ripgrep timeout in ms" },
+        "nativeTimeoutMs": { "type": "integer", "minimum": 100, "description": "Native scanner timeout in ms" },
+        "fuzzyDistance": { "type": "integer", "minimum": 0, "maximum": 5, "description": "Max Levenshtein distance for fuzzy matching" },
+        "allowDirs": { "type": "array", "items": { "type": "string" }, "description": "Which vault subdirs to search" },
+        "denyGlobs": { "type": "array", "items": { "type": "string" }, "description": "ripgrep glob exclusion patterns" },
+        "denyDirNames": { "type": "array", "items": { "type": "string" }, "description": "Directory names to skip in native scanner" },
+        "denyContentMaxChars": { "type": "integer", "minimum": 1000, "description": "Max chars to scan for content-based deny patterns" },
+        "denyContentPatterns": { "type": "array", "items": { "type": "string" }, "description": "Regex patterns for content-based file exclusion" },
+        "maxFileSize": { "type": "integer", "minimum": 0, "description": "Skip files larger than this many bytes in native scanner (0 = no limit)" },
+        "rgMaxBuffer": { "type": "integer", "minimum": 65536, "description": "Max buffer size for rg output in bytes" }
+      },
+      "additionalProperties": false
+    },
+    "cache": {
+      "type": "object",
+      "properties": {
+        "ttlMs": { "type": "integer", "minimum": 0, "description": "Cache TTL in ms" },
+        "maxEntries": { "type": "integer", "minimum": 1, "description": "Max cached query results" },
+        "maxDenyEntries": { "type": "integer", "minimum": 1, "description": "Max cached content-deny results" }
+      },
+      "additionalProperties": false
+    },
+    "debug": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean", "description": "Enable debug logging" }
+      },
+      "additionalProperties": false
+    },
+    "keywords": {
+      "type": "object",
+      "properties": {
+        "shortTech": { "type": "array", "items": { "type": "string" }, "description": "Tech terms matched regardless of length" },
+        "verbishExceptions": { "type": "array", "items": { "type": "string" }, "description": "-ing/-ed words that are not verbs" }
+      },
+      "additionalProperties": false
+    },
+    "prompt": {
+      "type": "object",
+      "properties": {
+        "optOut": { "type": "array", "items": { "type": "string" }, "description": "Phrases that skip context injection" },
+        "force": { "type": "array", "items": { "type": "string" }, "description": "Phrases that force context injection" }
+      },
+      "additionalProperties": false
+    },
+    "stopwords": {
+      "type": "object",
+      "properties": {
+        "languages": { "type": "array", "items": { "type": "string" }, "description": "Stopword files to load from stopwords/" }
+      },
+      "additionalProperties": false
+    },
+    "scoring": {
+      "type": "object",
+      "properties": {
+        "baseScore": { "type": "integer", "description": "Base score for any search hit" },
+        "forceBonus": { "type": "integer", "description": "Extra score when in force mode" },
+        "keywordMatch": {
+          "type": "object",
+          "properties": {
+            "single": { "type": "integer", "description": "Points per single keyword match" },
+            "multiWord": { "type": "integer", "description": "Points per multi-word keyword match" }
+          },
+          "additionalProperties": false
+        },
+        "keywordBonus": {
+          "type": "object",
+          "properties": {
+            "single": { "type": "integer" },
+            "multiWord": { "type": "integer" }
+          },
+          "additionalProperties": false
+        },
+        "fuzzyMatch": {
+          "type": "object",
+          "properties": {
+            "close": { "type": "integer", "description": "Score for fuzzy match distance ≤2" },
+            "far": { "type": "integer", "description": "Score for fuzzy match distance 3" }
+          },
+          "additionalProperties": false
+        },
+        "paths": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "pattern": { "type": "string" },
+              "score": { "type": "integer" }
+            },
+            "required": ["pattern", "score"],
+            "additionalProperties": false
+          }
+        },
+        "recency": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "days": { "type": "integer", "minimum": 0 },
+              "score": { "type": "integer" }
+            },
+            "required": ["days", "score"],
+            "additionalProperties": false
+          }
+        },
+        "longLine": {
+          "type": "object",
+          "properties": {
+            "threshold": { "type": "integer", "minimum": 0 },
+            "penalty": { "type": "integer" }
+          },
+          "additionalProperties": false
+        },
+        "exactKeywordMatch": {
+          "type": "object",
+          "properties": {
+            "score": { "type": "integer" },
+            "keywords": { "type": "array", "items": { "type": "string" } }
+          },
+          "additionalProperties": false
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false
+}

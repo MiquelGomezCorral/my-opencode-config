@@ -1,0 +1,8 @@
+interface:
+  display_name: "Btca"
+  short_description: "Source-first SDK research with btca"
+  brand_color: "#0F766E"
+  default_prompt: "Use $btca-first to answer this with the btca CLI first. Choose the narrowest relevant -r resources, run btca ask -q before relying on memory, preserve the exact supporting paths or URLs returned by BTCA, and explicitly say when BTCA was unavailable or incomplete."
+
+policy:
+  allow_implicit_invocation: true

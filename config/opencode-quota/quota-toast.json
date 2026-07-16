@@ -1,0 +1,28 @@
+{
+  "enabledProviders": [
+    "openai",
+    "opencode-go"
+  ],
+  "enableToast": false,
+  "tuiSidebarPanel": {
+    "enabled": true,
+    "formatStyle": "singleWindow"
+  },
+  "tuiCompactStatus": {
+    "enabled": true,
+    "homeBottom": true,
+    "sessionPrompt": true,
+    "suppressWhenNativeProviderQuota": false
+  },
+  "formatStyle": "allWindows",
+  "maintainerAnnouncements": {
+    "enabled": true,
+    "home": true
+  },
+  "workspaceId": "wrk_01KT68066XT11NZRAV35Y5TV3Y",
+  "opencodeGoWindows": [
+    "rolling",
+    "weekly",
+    "monthly"
+  ]
+}

@@ -1,0 +1,6 @@
+.git/
+.gitignore
+claude-code/
+scripts/
+stopwords/*.json
+README.md

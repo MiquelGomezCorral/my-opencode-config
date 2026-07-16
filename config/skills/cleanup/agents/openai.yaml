@@ -1,0 +1,4 @@
+interface:
+  display_name: "Cleanup"
+  short_description: "Post-task code cleanup gate"
+  default_prompt: "Use $cleanup after implementation to inspect the current diff, remove unnecessary type declarations, redundant code, and legacy leftovers, then run the relevant verification before finalizing."

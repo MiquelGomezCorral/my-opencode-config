@@ -1,0 +1,35 @@
+name: Check
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  bootstrap:
+    strategy:
+      matrix:
+        os: [macos-latest, ubuntu-latest]
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.2
+      - run: bash -n bootstrap.sh
+      - run: ./bootstrap.sh --check
+      - run: bun install --cwd config --frozen-lockfile
+      - run: bun test config/tests/force-subagent-model.test.js
+      - name: Test isolated install
+        shell: bash
+        run: |
+          test_home=$(mktemp -d)
+          SHELL=/bin/bash ./bootstrap.sh --home "$test_home" --skip-deps --skip-services
+          test -L "$test_home/.config/opencode/opencode.json"
+          test -L "$test_home/.config/opencode/tui.json"
+          test -L "$test_home/.config/opencode/AGENTS.md"
+          test -L "$test_home/.config/opencode/agents"
+          test -L "$test_home/.config/opencode/commands"
+          test -L "$test_home/.config/opencode/plugins"
+          test -L "$test_home/.config/opencode/skills"
+          test -L "$test_home/.agents/skills"
+          test -L "$test_home/.config/btca/btca.config.jsonc"

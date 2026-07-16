@@ -1,0 +1,23 @@
+{
+  "name": "vault-context",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "license": "MIT",
+  "description": "Lightweight Obsidian RAG context injector for opencode and Claude Code",
+  "files": [
+    "vault-context.js",
+    "vault-context.config.json",
+    "vault-context.schema.json",
+    "LICENSE"
+  ],
+  "scripts": {
+    "check": "node --check vault-context.js",
+    "benchmark": "node scripts/benchmark.mjs",
+    "benchmark:orig": "node scripts/benchmark.mjs --kw=168",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

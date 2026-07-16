@@ -1,0 +1,177 @@
+{
+  "$schema": "./vault-context.schema.json",
+  "_doc": "All defaults. Env vars override. Edit this file to customize. Restart opencode after changes.",
+
+  "vault": {
+    "path": "",
+    "_doc": "Path to Obsidian vault. Default: $HOME/Desktop/Obsidian. Set OBSIDIAN_VAULT env var to override."
+  },
+  "mode": {
+    "value": "auto",
+    "_doc": "auto | off | force. Set VAULT_CONTEXT_MODE env var to override."
+  },
+  "search": {
+    "maxHits": 20,
+    "maxChars": 1800,
+    "minScore": 5,
+    "rgTimeoutMs": 600,
+    "nativeTimeoutMs": 2000,
+    "fuzzyDistance": 3,
+    "allowDirs": ["CODE", "VIDEXT", "UNI"],
+    "denyGlobs": [
+      "!.obsidian/**",
+      "!.git/**",
+      "!Images/**",
+      "!Excalidraw/**",
+      "!**/*.canvas",
+      "!**/*.excalidraw.md"
+    ],
+    "denyDirNames": [".obsidian", ".git", "Images", "Excalidraw"],
+    "denyContentMaxChars": 200000,
+    "denyContentPatterns": [
+      "^excalidraw-plugin\\s*:"
+    ],
+    "maxFileSize": 5242880,
+    "rgMaxBuffer": 1048576
+  },
+  "scoring": {
+    "_doc": "All scoring values are customizable. Higher values = more weight. Path bonuses are applied in order (first matching path wins its score). Recency tiers are checked top-to-bottom (first matching tier wins).",
+    "baseScore": 3,
+    "forceBonus": 3,
+    "keywordMatch": {
+      "single": 2,
+      "multiWord": 3,
+      "_doc": "Points per keyword found in the haystack. single: plain keywords. multiWord: phrases with spaces/hyphens/underscores."
+    },
+    "keywordBonus": {
+      "single": 2,
+      "multiWord": 3,
+      "_doc": "Extra points per keyword in the scoreHit phase. Same shape as keywordMatch."
+    },
+    "fuzzyMatch": {
+      "close": 3,
+      "far": 2,
+      "_doc": "Fuzzy (Levenshtein) match scoring. close: distance ≤2. far: distance 3."
+    },
+    "paths": [
+      { "pattern": "code/git",   "score": 3 },
+      { "pattern": "code/llms",  "score": -3 },
+      { "pattern": "code/python","score": 3 },
+      { "pattern": "code/",      "score": 2 },
+      { "pattern": "vidext/",    "score": 2 },
+      { "pattern": "projects/",  "score": 1 },
+      { "pattern": "uni/",       "score": 2 }
+    ],
+    "_doc_paths": "Array of { pattern, score }. Path is checked against the relative vault path (lowercase). First match wins. Add your own folders with custom scores.",
+    "recency": [
+      { "days": 7,   "score": 3 },
+      { "days": 14,  "score": 2 },
+      { "days": 30,  "score": 1 }
+    ],
+    "_doc_recency": "Array of { days, score }. Applied top-to-bottom; first tier where file age ≤ days wins its score. Set to [] to disable recency scoring.",
+    "longLine": {
+      "threshold": 260,
+      "penalty": 1,
+      "_doc": "Penalize very long lines (noisy). Set penalty to 0 to disable."
+    },
+    "exactKeywordMatch": {
+      "score": 5,
+      "keywords": ["git"],
+      "_doc": "If ANY of these keywords is in the prompt AND the file path matches any keyword, add this score. Useful for boosting domain-specific keywords in domain-specific folders."
+    }
+  },
+  "cache": {
+    "ttlMs": 300000,
+    "maxEntries": 50,
+    "maxDenyEntries": 500
+  },
+  "debug": {
+    "enabled": false
+  },
+  "keywords": {
+    "shortTech": [
+      "git", "api", "rag", "llm", "mcp", "cli", "tui", "ui", "ux", "sql", "css",
+      "ssh", "nas", "dvc", "n8n", "tar", "zip", "top", "npm", "yarn", "bun", "pip", "uv",
+      "aws", "gcp", "cpu", "gpu", "ml", "ai", "sdk", "ide", "vim", "zsh", "bash", "fish",
+      "pwsh", "nix", "pr", "ci", "cd", "go", "js", "ts", "py", "rb", "sh", "md",
+      "html", "xml", "json", "yaml", "yml", "toml", "ini", "cfg", "conf", "log", "env",
+      "gitignore", "dockerfile", "makefile", "bar", "dev", "zod", "orm",
+      "app", "web", "api", "db", "io", "os", "vm", "vps", "dns", "ssl", "tls",
+      "http", "https", "ftp", "tcp", "udp", "ip", "mac", "ram", "ssd", "hdd",
+      "usb", "hdmi", "vga", "dvi", "pci", "pcie", "sata", "nvme", "m2",
+      "tpu", "fpga", "asic", "soc", "iot", "dl", "nlp", "cv", "rl",
+      "gan", "vae", "lstm", "rnn", "cnn", "transformer", "bert", "gpt",
+      "llama", "mistral", "claude", "gemini", "openai", "anthropic",
+      "huggingface", "pytorch", "tensorflow", "keras", "scikit",
+      "pandas", "numpy", "scipy", "matplotlib", "seaborn", "plotly",
+      "dash", "streamlit", "gradio", "fastapi", "flask", "django", "express",
+      "next", "nuxt", "svelte", "vue", "react", "angular", "tailwind",
+      "bootstrap", "sass", "less", "webpack", "vite", "rollup", "esbuild",
+      "swc", "babel", "eslint", "prettier", "biome", "jest", "vitest",
+      "mocha", "cypress", "playwright", "selenium", "puppeteer",
+      "docker", "kubernetes", "helm", "terraform", "ansible", "jenkins",
+      "github", "gitlab", "bitbucket", "vercel", "netlify", "cloudflare",
+      "azure", "digitalocean", "linode", "vultr", "hetzner", "ovh",
+      "scaleway", "render", "railway", "fly", "heroku",
+      "supabase", "firebase", "planetscale", "neon", "turso", "litestream",
+      "postgres", "mysql", "mariadb", "sqlite", "mongodb", "redis",
+      "memcached", "elasticsearch", "opensearch", "meilisearch", "typesense",
+      "algolia", "pinecone", "weaviate", "qdrant", "chroma", "faiss",
+      "annoy", "hnsw", "ivf", "pq", "sq", "lsh", "minhash", "simhash",
+      "jaccard", "cosine", "euclidean", "manhattan", "minkowski",
+      "chebyshev", "hamming", "levenshtein", "jaro", "winkler",
+      "sorensen", "dice", "overlap", "containment", "tfidf", "bm25", "okapi",
+      "language", "model", "embedding", "vector", "tensor", "matrix",
+      "array", "list", "dict", "set", "tuple", "queue", "stack", "heap",
+      "tree", "graph", "node", "edge", "vertex", "path", "cycle", "dag",
+      "bst", "avl", "rbtree", "btree", "trie", "suffix", "prefix", "infix",
+      "postfix", "regex", "pattern", "match", "search", "sort", "filter",
+      "map", "reduce", "fold", "scan", "zip", "unzip", "compress", "decompress",
+      "encode", "decode", "serialize", "deserialize", "marshal", "unmarshal",
+      "parse", "format", "validate", "sanitize", "escape", "unescape",
+      "hash", "encrypt", "decrypt", "sign", "verify",
+      "auth", "oauth", "jwt", "session", "cookie", "token", "key",
+      "cert", "ca", "csr", "pem", "der", "p12", "pfx", "jks",
+      "keystore", "truststore", "vault", "secret", "password", "passphrase",
+      "pin", "otp", "totp", "hotp", "mfa", "2fa", "sso", "saml",
+      "oidc", "openid", "connect", "scope", "claim", "audience",
+      "issuer", "subject", "principal", "role", "permission", "policy",
+      "acl", "rbac", "abac", "dac", "firewall", "waf", "ids", "ips",
+      "siem", "soc", "noc", "devops", "sre", "platform", "infrastructure",
+      "architecture", "design", "pattern", "antipattern", "smell",
+      "refactor", "clean", "solid", "dry", "kiss", "yagni",
+      "tdd", "bdd", "ddd", "cqrs", "es", "eda", "soa",
+      "microservice", "monolith", "serverless", "faas", "paas", "iaas",
+      "saas", "caas", "baas", "dbaaS",
+      "rest", "graphql", "grpc", "websocket", "sse", "longpoll",
+      "shortpoll", "push", "pull", "pubsub", "queue", "topic", "stream",
+      "batch", "realtime", "async", "sync", "blocking", "nonblocking",
+      "concurrent", "parallel", "distributed", "scalable", "available",
+      "consistent", "partitioned", "replicated", "sharded", "clustered",
+      "loadbalanced", "cached", "indexed", "optimized", "profiled",
+      "monitored", "logged", "traced", "alerted", "notified",
+      "escalated", "incident", "postmortem", "runbook", "playbook",
+      "checklist", "template", "boilerplate", "scaffold", "generator",
+      "script", "macro", "hook", "plugin", "extension", "addon",
+      "module", "package", "library", "framework", "toolkit",
+      "mobile", "desktop", "embedded", "robotics", "automation"
+    ],
+    "verbishExceptions": ["staging", "routing", "tooling", "testing", "logging", "training"],
+    "_doc": "shortTech: terms matched as keywords regardless of length. verbishExceptions: -ing/-ed words that are actually nouns."
+  },
+  "prompt": {
+    "optOut": [
+      "no vault", "sin obsidian", "no obsidian", "no rag",
+      "no extra context", "without vault context", "skip vault", "skip obsidian"
+    ],
+    "force": [
+      "use vault", "search obsidian", "with obsidian context",
+      "usa obsidian", "busca en obsidian", "vault context", "obsidian context"
+    ],
+    "_doc": "optOut: phrases that skip context injection. force: phrases that force it."
+  },
+  "stopwords": {
+    "languages": ["en", "es"],
+    "_doc": "Which stopword files to load from stopwords/ directory (en.json, es.json)."
+  }
+}

@@ -1,0 +1,9 @@
+.DS_Store
+.env
+.env.*
+*.backup
+*.bak
+*.log
+node_modules/
+.codegraph/
+config/plugins/*/.git/
