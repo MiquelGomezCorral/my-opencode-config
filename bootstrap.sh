@@ -25,6 +25,9 @@ while (($#)); do
       [[ $# -ge 2 ]] || { usage; exit 2; }
       HOME=$2
       export HOME
+      XDG_CONFIG_HOME="$HOME/.config"
+      XDG_DATA_HOME="$HOME/.local/share"
+      export XDG_CONFIG_HOME XDG_DATA_HOME
       shift
       ;;
     -h|--help) usage; exit 0 ;;
