@@ -405,6 +405,10 @@ Take `best_description` from the JSON output and update the skill's SKILL.md fro
 
 ---
 
+### Security Gate
+
+Before packaging or sharing a created or modified skill, load and apply `skillspector` to scan the skill directory. Investigate matched lines before treating static findings as vulnerabilities.
+
 ### Package and Present (only if `present_files` tool is available)
 
 Check whether you have access to the `present_files` tool. If you don't, skip this step. If you do, package the skill and present the .skill file to the user:

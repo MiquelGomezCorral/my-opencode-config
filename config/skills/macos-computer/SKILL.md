@@ -15,7 +15,7 @@ description: "Technical specifications and dev stack for this MacBook Air runnin
 - **Runtime:** Bun 1.3.2 (primary), Node.js v25.9.0
 - **Package Manager:** Bun 1.3.14 (pinned in `packageManager` field) — never npm or pnpm
 - **System tools:** Homebrew 5.1.9 (`brew`) for system-level installs
-- **Default Python:** 3.9.6 (`/usr/bin/python3`, Xcode CLT) — no conda
+- **Default Python:** 3.9.6 (`/usr/bin/python3`, Xcode CLT) in the Vidext monorepo; standalone template projects may use conda through `python-project-setup`
 - **No CUDA:** M3 uses Metal/MPS — use `torch.backends.mps` for any ML tasks
 
 # Vidext Monorepo Stack
@@ -50,6 +50,6 @@ bun format:fix           # Biome check --write
 - **Always use `bun`** — never `npm`, `npx`, or `pnpm`.
 - Shell scripts must target **zsh on macOS (Darwin)**. No `apt` — use `brew`.
 - ARM64: verify package ARM compatibility before suggesting installs.
-- No conda — use `pip3` or `python3 -m venv` for any Python work.
+- In the Vidext monorepo, do not use conda; use `pip3` or `python3 -m venv`. For standalone Python template projects, load and apply `python-project-setup` instead.
 - For ML/GPU: Apple MPS only (`torch.backends.mps`), not CUDA.
-- Run `bun typecheck && bun run typecheck:safety && bun format` before claiming any change is complete.
+- Run `bun typecheck`, `bun run typecheck:safety`, and `bun format` as separate calls before claiming any change is complete.

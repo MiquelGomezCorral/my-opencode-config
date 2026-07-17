@@ -35,10 +35,7 @@ Never run `bun run setup`, `bun run cleanup`, or any upstream install script. Ne
 
 Default agents and reviewer specialists use only `openai/*`, `opencode/*`, or `opencode-go/*` models. Do not import an upstream model outside those providers.
 
-OpenCode has no native cross-model fallback chain. If a configured model is unavailable, the manual recovery order is:
-
-1. `openai/gpt-5.4`
-2. `opencode/big-pickle`
+The local `task` tool provides cross-model recovery. Use the configured model by default, `model` for a preferred first attempt, or `models` for an exact ordered chain with no implicit fallbacks.
 
 Record accepted upstream changes in `CODE/LLMs/opencode/setup.md` and update the relevant Obsidian agent or skill note. Never record credentials or tokens.
 

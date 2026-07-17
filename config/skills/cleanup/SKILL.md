@@ -15,6 +15,11 @@ description: Post-implementation cleanup gate for current diffs. Use after the a
 
 Run this skill after implementation work and before the final response. Treat it as a scoped cleanup gate over the task diff, not as permission for broad refactoring.
 
+## Skill Composition
+
+- Load and apply `deslop` first for AI-generated comments, abnormal defensive code, type-bypassing casts, and avoidable nesting.
+- Then run this skill's type, redundancy, and legacy passes. Do not repeat edits already covered by `deslop`.
+
 ## Workflow
 
 1. Identify the task surface:

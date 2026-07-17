@@ -23,6 +23,10 @@ Do not merely list questions. Drive toward shared understanding. For every quest
 
 Do not implement during a `grill-me` session unless the user explicitly asks to switch from interrogation to execution.
 
+## Skill Composition
+
+- When grilling a repository-specific plan and `AGENTS.md` or `.agents/` exists, load and apply `agents-memory`; read only relevant architecture, decisions, conventions, workflow, or known-error context. Do not bootstrap or update memory unless requested.
+
 ## Workflow
 
 1. Identify the plan under review:

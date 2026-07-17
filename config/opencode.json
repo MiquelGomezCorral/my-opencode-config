@@ -13,7 +13,7 @@
     "~/.config/opencode/security-rules.md",
     "~/.config/opencode/surgical-rules.md",
     "Always load the ponytail skill before writing or modifying code. Be a lazy senior dev: question if the code needs to exist at all, prefer stdlib/platform/built-in over new code, delete over add, one-line over many, boring over clever, fewest files possible. Mark intentional shortcuts with `ponytail:` comment.",
-    "Use the task tool for subagents. It automatically retries model failures with openai/gpt-5.5, then opencode/big-pickle, and accepts an optional model for the first attempt."
+    "Use the task tool for subagents. Without overrides it runs the configured model, then openai/gpt-5.5, then opencode/big-pickle. Pass model for a preferred first attempt. Pass models for an exact ordered chain with no implicit fallbacks; encode every user-specified model order or provider restriction there and never add an unrequested provider."
   ],
   "command": {
     "quota": {
@@ -215,6 +215,10 @@
         }
       }
     },
+    "explore": {
+      "mode": "subagent",
+      "model": "opencode/big-pickle"
+    },
     "general": {
       "mode": "subagent",
       "model": "openai/gpt-5.6-terra",
@@ -241,7 +245,7 @@
       "command": [
         "npx",
         "-y",
-        "@modelcontextprotocol/server-sequential-thinking"
+        "@modelcontextprotocol/server-sequential-thinking@2026.7.4"
       ]
     },
     "btca": {
@@ -258,13 +262,13 @@
     },
     "playwright": {
       "type": "local",
-      "command": ["npx", "-y", "@playwright/mcp@latest", "--caps=devtools"],
+      "command": ["npx", "-y", "@playwright/mcp@0.0.78", "--caps=devtools"],
       "enabled": true,
       "timeout": 30000
     },
     "searxng": {
       "type": "local",
-      "command": ["npx", "-y", "mcp-searxng"],
+      "command": ["npx", "-y", "mcp-searxng@1.11.1"],
       "environment": {
         "SEARXNG_URL": "http://localhost:8080"
       },

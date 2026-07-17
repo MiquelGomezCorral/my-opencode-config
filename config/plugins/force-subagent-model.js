@@ -9,24 +9,40 @@ function parseModel(value) {
   return { providerID: value.slice(0, separator), modelID: value.slice(separator + 1) }
 }
 
+const formatModel = ({ providerID, modelID }) => `${providerID}/${modelID}`
+
+function requireData(result, message) {
+  if (result.error || result.data === undefined) throw new Error(message, { cause: result.error })
+  return result.data
+}
+
+function timeoutSignal(signal) {
+  const timeout = AbortSignal.timeout(5_000)
+  return signal ? AbortSignal.any([signal, timeout]) : timeout
+}
+
 export default async ({ client, directory }, options = {}) => {
   const attemptTimeoutMs =
     Number.isFinite(options.attemptTimeoutMs) && options.attemptTimeoutMs > 0
       ? options.attemptTimeoutMs
       : ATTEMPT_TIMEOUT_MS
   const sessionWaiters = new Map()
+  const activeSessions = new Set()
 
-  const watchSession = (sessionID, timeoutMs) => {
+  const watchSession = (sessionID, timeoutMs, signal, accept = () => true) => {
     let timer
     let waiter
+    let onAbort
     const cleanup = () => {
       clearTimeout(timer)
+      if (onAbort) signal.removeEventListener("abort", onAbort)
       const waiters = sessionWaiters.get(sessionID)
       waiters?.delete(waiter)
       if (waiters?.size === 0) sessionWaiters.delete(sessionID)
     }
     const promise = new Promise((resolve) => {
       waiter = (event) => {
+        if (event.type !== "timeout" && !accept(event)) return
         cleanup()
         resolve(event)
       }
@@ -34,6 +50,11 @@ export default async ({ client, directory }, options = {}) => {
       waiters.add(waiter)
       sessionWaiters.set(sessionID, waiters)
       timer = setTimeout(() => waiter({ type: "timeout" }), timeoutMs)
+      if (signal) {
+        onAbort = () => waiter({ type: "aborted" })
+        if (signal.aborted) onAbort()
+        else signal.addEventListener("abort", onAbort, { once: true })
+      }
     })
     return { promise, cancel: cleanup }
   }
@@ -43,9 +64,20 @@ export default async ({ client, directory }, options = {}) => {
   }
 
   const handleSessionEvent = (event) => {
+    if (event.type === "message.updated") {
+      const info = event.properties?.info
+      if (info?.role === "assistant" && info.error) {
+        emitSessionEvent(info.sessionID, { type: "error" })
+      }
+      return
+    }
+
     const sessionID = event.properties?.sessionID
     if (!sessionID) return
     if (event.type === "session.error") emitSessionEvent(sessionID, { type: "error" })
+    if (event.type === "session.status" && event.properties.status?.type === "retry") {
+      emitSessionEvent(sessionID, { type: "retry" })
+    }
     if (event.type === "session.idle") emitSessionEvent(sessionID, { type: "idle" })
   }
 
@@ -71,20 +103,12 @@ export default async ({ client, directory }, options = {}) => {
   })()
 
   return {
-    dispose: () => eventController.abort(),
+    dispose: async () => eventController.abort(),
     event: async ({ event }) => handleSessionEvent(event),
-    config: (cfg) => {
-      cfg.agent ??= {}
-      cfg.agent.explore ??= {}
-      cfg.agent.general ??= {}
-
-      cfg.agent.explore.model = "opencode/big-pickle"
-      cfg.agent.general.model = "opencode/deepseek-v4-pro"
-    },
     tool: {
       task: tool({
         description:
-          "Launch or resume an allowed subagent. The selected or configured model runs first, then failures automatically fall back to openai/gpt-5.5 and opencode/big-pickle.",
+          "Launch or resume an allowed subagent. By default, the selected or configured model runs first, then openai/gpt-5.5 and opencode/big-pickle. Pass models for an exact ordered chain with no implicit fallbacks.",
         args: {
           description: tool.schema.string().describe("A short 3-5 word task description"),
           prompt: tool.schema.string().describe("The task for the subagent"),
@@ -99,8 +123,15 @@ export default async ({ client, directory }, options = {}) => {
             .string()
             .optional()
             .describe("Optional provider/model override for the first attempt"),
+          models: tool.schema
+            .array(tool.schema.string())
+            .min(1)
+            .optional()
+            .describe("Exact ordered provider/model chain; cannot be combined with model"),
         },
         async execute(args, context) {
+          if (args.model && args.models) throw new Error("Pass model or models, not both")
+
           await context.ask({
             permission: "task",
             patterns: [args.subagent_type],
@@ -109,57 +140,110 @@ export default async ({ client, directory }, options = {}) => {
               description: args.description,
               subagent_type: args.subagent_type,
               model: args.model,
+              models: args.models,
             },
           })
 
-          const agents = await client.app.agents({ query: { directory: context.directory } })
-          const agent = agents.data?.find((candidate) => candidate.name === args.subagent_type)
+          const agents = requireData(
+            await client.app.agents({ query: { directory: context.directory } }),
+            "Unable to list agents",
+          )
+          const agent = agents.find((candidate) => candidate.name === args.subagent_type)
           if (!agent) throw new Error(`${args.subagent_type} is not a valid agent type`)
 
-          const parent = await client.session.get({
-            path: { id: context.sessionID },
-            query: { directory: context.directory },
-          })
-          if (!parent.data) throw new Error("Unable to read the parent session")
+          const parent = requireData(
+            await client.session.get({
+              path: { id: context.sessionID },
+              query: { directory: context.directory },
+            }),
+            "Unable to read the parent session",
+          )
 
           const primaryModel = args.model ? parseModel(args.model) : agent.model
-          if (!primaryModel) throw new Error(`${agent.name} has no configured model; pass model explicitly`)
-
-          const models = [primaryModel, ...FALLBACK_MODELS.map(parseModel)].filter(
-            (model, index, all) =>
-              all.findIndex(
-                (candidate) =>
-                  candidate.providerID === model.providerID && candidate.modelID === model.modelID,
-              ) === index,
-          )
-          const permission = [
-            ...(parent.data.permission ?? []).filter(
-              (rule) => rule.permission === "external_directory" || rule.action === "deny",
-            ),
-            ...(agent.tools?.todowrite
-              ? []
-              : [{ permission: "todowrite", pattern: "*", action: "deny" }]),
-            ...(agent.tools?.task
-              ? []
-              : [{ permission: "task", pattern: "*", action: "deny" }]),
-          ]
-
-          const createChild = async (modelName) => {
-            const created = await client.session.create({
-              body: {
-                parentID: context.sessionID,
-                title: `${args.description} (${modelName} @${agent.name} subagent)`,
-                agent: agent.name,
-                permission,
-              },
-              query: { directory: context.directory },
-            })
-            if (!created.data) throw new Error("Unable to create the subagent session")
-            return created.data.id
+          if (!args.models && !primaryModel) {
+            throw new Error(`${agent.name} has no configured model; pass model or models explicitly`)
           }
 
-          const firstModelName = `${models[0].providerID}/${models[0].modelID}`
-          const firstSessionID = args.task_id ?? (await createChild(firstModelName))
+          const models = args.models
+            ? args.models.map(parseModel)
+            : [primaryModel, ...FALLBACK_MODELS.map(parseModel)].filter(
+                (model, index, all) =>
+                  all.findIndex((candidate) => formatModel(candidate) === formatModel(model)) ===
+                  index,
+              )
+          const permission = (parent.permission ?? []).filter(
+            (rule) => rule.permission === "external_directory" || rule.action === "deny",
+          )
+          if (!agent.tools?.todowrite) {
+            permission.push({ permission: "todowrite", pattern: "*", action: "deny" })
+          }
+          if (!agent.tools?.task) permission.push({ permission: "task", pattern: "*", action: "deny" })
+
+          const firstModelName = formatModel(models[0])
+          const sourceSessionID = args.task_id
+          if (sourceSessionID) {
+            const resumed = requireData(
+              await client.session.get({
+                path: { id: args.task_id },
+                query: { directory: context.directory },
+                signal: AbortSignal.timeout(5_000),
+              }),
+              `Unable to read subagent session ${sourceSessionID}`,
+            )
+            if (
+              resumed.parentID !== context.sessionID ||
+              resumed.directory !== context.directory ||
+              resumed.agent !== agent.name
+            ) {
+              throw new Error(`Subagent session ${sourceSessionID} does not match this task`)
+            }
+            const statuses = requireData(
+              await client.session.status({
+                query: { directory: context.directory },
+                signal: AbortSignal.timeout(5_000),
+              }),
+              "Unable to read subagent status",
+            )
+            const status = statuses[sourceSessionID]
+            if (status?.type === "busy" || status?.type === "retry") {
+              throw new Error(`Subagent session ${sourceSessionID} is not idle`)
+            }
+            if (activeSessions.has(sourceSessionID)) {
+              throw new Error(`Subagent session ${sourceSessionID} is already running`)
+            }
+            activeSessions.add(sourceSessionID)
+          }
+
+          const createAttempt = async (modelName) => {
+            const created = sourceSessionID
+              ? await client.session.fork({
+                  path: { id: sourceSessionID },
+                  query: { directory: context.directory },
+                })
+              : await client.session.create({
+                  body: {
+                    parentID: context.sessionID,
+                    title: `${args.description} (${modelName} @${agent.name} subagent)`,
+                    agent: agent.name,
+                    permission,
+                  },
+                  query: { directory: context.directory },
+                })
+            return requireData(
+              created,
+              sourceSessionID
+                ? `Unable to fork subagent session ${sourceSessionID}`
+                : "Unable to create the subagent session",
+            ).id
+          }
+
+          let firstSessionID
+          try {
+            firstSessionID = await createAttempt(firstModelName)
+          } catch (error) {
+            if (sourceSessionID) activeSessions.delete(sourceSessionID)
+            throw error
+          }
 
           const render = (state, content, model, attemptedModels, sessionID, sessionIds) => ({
             title: args.description,
@@ -189,43 +273,62 @@ export default async ({ client, directory }, options = {}) => {
             } catch {}
           }
 
-          const readOutput = async (sessionID, existingMessages) => {
-            try {
-              const messages = await client.session.messages({
+          const readOutput = async (sessionID, existingMessages, signal) => {
+            const messages = requireData(
+              await client.session.messages({
                 path: { id: sessionID },
                 query: { directory: context.directory, limit: 100 },
-                signal: AbortSignal.timeout(5_000),
-              })
-              const latest = (messages.data ?? [])
-                .filter(
-                  (message) =>
-                    message.info.role === "assistant" &&
-                    !message.info.error &&
-                    !existingMessages.has(message.info.id),
-                )
-                .sort((left, right) => left.info.time.created - right.info.time.created)
-                .at(-1)
-              return latest?.parts
+                signal: timeoutSignal(signal),
+              }),
+              `Unable to read subagent output from ${sessionID}`,
+            )
+            const latest = messages
+              .filter(
+                (message) =>
+                  message.info.role === "assistant" &&
+                  !message.info.error &&
+                  !existingMessages.has(message.info.id),
+              )
+              .sort((left, right) => left.info.time.created - right.info.time.created)
+              .at(-1)
+            if (!latest) return { found: false }
+            return {
+              found: true,
+              output: latest.parts
                 .filter((part) => part.type === "text")
                 .map((part) => part.text)
                 .join("")
-                .trim()
-            } catch {}
+                .trim(),
+            }
           }
 
           const runAttempt = async (model, sessionID) => {
-            let existingMessages
-            try {
-              const before = await client.session.messages({
-                path: { id: sessionID },
-                query: { directory: context.directory, limit: 100 },
-                signal: AbortSignal.timeout(5_000),
-              })
-              existingMessages = new Set((before.data ?? []).map((message) => message.info.id))
-            } catch {
-              return
+            const signal = args.background ? undefined : context.abort
+            const stopIfAborted = async () => {
+              if (!signal?.aborted) return
+              await abortChild(sessionID)
+              signal.throwIfAborted()
             }
-            const watcher = watchSession(sessionID, attemptTimeoutMs)
+            await stopIfAborted()
+            let before
+            try {
+              before = requireData(
+                await client.session.messages({
+                  path: { id: sessionID },
+                  query: { directory: context.directory, limit: 100 },
+                  signal: timeoutSignal(signal),
+                }),
+                `Unable to inspect subagent session ${sessionID}`,
+              )
+            } catch (error) {
+              if (signal?.aborted) await stopIfAborted()
+              await abortChild(sessionID)
+              throw error
+            }
+            await stopIfAborted()
+            const existingMessages = new Set(before.map((message) => message.info.id))
+            const deadline = Date.now() + attemptTimeoutMs
+            let watcher = watchSession(sessionID, attemptTimeoutMs, signal)
             try {
               const prompted = await client.session.promptAsync({
                 path: { id: sessionID },
@@ -235,7 +338,7 @@ export default async ({ client, directory }, options = {}) => {
                   model,
                   parts: [{ type: "text", text: args.prompt }],
                 },
-                signal: AbortSignal.timeout(5_000),
+                signal: timeoutSignal(signal),
               })
               if (prompted.error) {
                 watcher.cancel()
@@ -244,61 +347,103 @@ export default async ({ client, directory }, options = {}) => {
             } catch {
               watcher.cancel()
               await abortChild(sessionID)
+              if (!args.background && context.abort.aborted) context.abort.throwIfAborted()
               return
             }
 
-            const event = await watcher.promise
-            if (event.type === "timeout") {
-              await abortChild(sessionID)
-              return
+            while (true) {
+              const event = await watcher.promise
+              if (event.type === "aborted") {
+                watcher.cancel()
+                await abortChild(sessionID)
+                context.abort.throwIfAborted()
+              }
+              if (event.type === "timeout" || event.type === "retry") {
+                await abortChild(sessionID)
+                return
+              }
+              if (event.type === "error") return
+
+              const nextWatcher = watchSession(
+                sessionID,
+                Math.max(1, deadline - Date.now()),
+                signal,
+              )
+              let read
+              try {
+                read = await readOutput(sessionID, existingMessages, signal)
+              } catch (error) {
+                nextWatcher.cancel()
+                if (signal?.aborted) await stopIfAborted()
+                await abortChild(sessionID)
+                throw error
+              }
+              if (signal?.aborted) {
+                nextWatcher.cancel()
+                await stopIfAborted()
+              }
+              if (read.found) {
+                nextWatcher.cancel()
+                return read.output
+              }
+
+              watcher = nextWatcher
             }
-            if (event.type === "error") return
-            return readOutput(sessionID, existingMessages)
           }
 
           const run = async () => {
             const attemptedModels = []
             const sessionIds = []
-            for (const [index, model] of models.entries()) {
-              const modelName = `${model.providerID}/${model.modelID}`
-              const sessionID = index === 0 ? firstSessionID : await createChild(modelName)
-              attemptedModels.push(modelName)
-              sessionIds.push(sessionID)
-              const output = await runAttempt(model, sessionID)
-              if (output) {
-                return render("completed", output, modelName, attemptedModels, sessionID, sessionIds)
+            try {
+              for (const [index, model] of models.entries()) {
+                if (!args.background) context.abort.throwIfAborted()
+                const modelName = formatModel(model)
+                const sessionID = index === 0 ? firstSessionID : await createAttempt(modelName)
+                attemptedModels.push(modelName)
+                sessionIds.push(sessionID)
+                const output = await runAttempt(model, sessionID)
+                if (output) {
+                  return render("completed", output, modelName, attemptedModels, sessionID, sessionIds)
+                }
               }
-            }
 
-            return render(
-              "error",
-              `All subagent models failed: ${attemptedModels.join(", ")}`,
-              undefined,
-              attemptedModels,
-              sessionIds.at(-1),
-              sessionIds,
-            )
+              return render(
+                "error",
+                `All subagent models failed: ${attemptedModels.join(", ")}`,
+                undefined,
+                attemptedModels,
+                sessionIds.at(-1),
+                sessionIds,
+              )
+            } finally {
+              if (sourceSessionID) activeSessions.delete(sourceSessionID)
+            }
           }
 
           const notifyParent = async (result) => {
-            const parentWatcher = watchSession(context.sessionID, attemptTimeoutMs)
+            const parentWatcher = watchSession(
+              context.sessionID,
+              attemptTimeoutMs,
+              undefined,
+              (event) => event.type === "idle" || event.type === "error",
+            )
+            let parentReady = false
             try {
-              const statuses = await client.session.status({
-                query: { directory: context.directory },
-                signal: AbortSignal.timeout(5_000),
-              })
-              if (statuses.data?.[context.sessionID]) {
-                await parentWatcher.promise
-              } else {
-                parentWatcher.cancel()
-              }
-            } catch {
-              parentWatcher.cancel()
-            }
+              const status = requireData(
+                await client.session.status({
+                  query: { directory: context.directory },
+                  signal: AbortSignal.timeout(5_000),
+                }),
+                "Unable to read parent session status",
+              )[context.sessionID]
+              parentReady = status?.type !== "busy" && status?.type !== "retry"
+            } catch {}
+            if (parentReady) parentWatcher.cancel()
+            else await parentWatcher.promise
 
             for (let attempt = 0; attempt < 2; attempt++) {
               try {
-                await client.session.promptAsync({
+                const notified = await client.session.promptAsync({
                   path: { id: context.sessionID },
                   query: { directory: context.directory },
                   body: {
@@ -307,27 +452,35 @@ export default async ({ client, directory }, options = {}) => {
                   },
                   signal: AbortSignal.timeout(5_000),
                 })
+                if (notified.error) throw new Error("Parent notification was rejected", { cause: notified.error })
                 return
               } catch {
                 if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 500))
               }
             }
 
-            await client.app.log({
-              body: {
-                service: "subagent-model-fallback",
-                level: "error",
-                message: "Unable to notify parent session of subagent completion",
-                extra: { parentSessionID: context.sessionID },
-              },
-            })
+            await client.app
+              .log({
+                body: {
+                  service: "subagent-model-fallback",
+                  level: "error",
+                  message: "Unable to notify parent session of subagent completion",
+                  extra: { parentSessionID: context.sessionID },
+                },
+              })
+              .catch(() => {})
           }
 
-          if (!args.background) return run()
+          if (!args.background) {
+            if (context.abort.aborted) {
+              await abortChild(firstSessionID)
+              if (sourceSessionID) activeSessions.delete(sourceSessionID)
+              context.abort.throwIfAborted()
+            }
+            return run()
+          }
 
-          void run()
-            .then(notifyParent)
-            .catch((error) =>
+          void run().then(notifyParent, (error) =>
               notifyParent(
                 render(
                   "error",

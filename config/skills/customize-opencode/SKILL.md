@@ -15,6 +15,10 @@ Configuring opencode itself. Not for application code.
 4. Update vault — always update `setup.md` + relevant files in `CODE/LLMs/`
 5. Verify — check validity, tell user to restart if needed
 
+## Skill Composition
+
+- Before reading or editing vault documentation, load and apply `obsidian-vault` for the canonical vault path, frontmatter preservation, and filesystem safety rules.
+
 ## Vault sync rules
 
 | Change | Vault file |

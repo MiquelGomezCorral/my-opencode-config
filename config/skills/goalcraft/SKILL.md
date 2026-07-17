@@ -19,6 +19,10 @@ A strong goal defines a closed loop: choose the next useful action, run it, scor
 
 Default to drafting only. Do not call `create_goal`, set a thread goal, or otherwise activate the goal unless the user explicitly asks to start or set it.
 
+## Skill Composition
+
+- When the goal targets a repository with `AGENTS.md` or `.agents/`, load and apply `agents-memory`; read only the memory files relevant to the goal's scope. Do not bootstrap or update memory unless requested.
+
 ## Workflow
 
 1. Decide whether a Goal is the right tool:

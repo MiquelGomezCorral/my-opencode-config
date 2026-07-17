@@ -23,6 +23,11 @@ description: Stage changes, create a conventional commit, push the branch, and c
   - Non-goals: what this PR does not change.
 - If brief context is not provided, infer conservatively from the diff and full conversation history. Mark unknowns as `Not provided`; do not invent claims.
 
+## Skill Composition
+
+- For shipped-work PR metadata, load and apply `make-pr-easy-to-review` for reviewer entry points, generated/mechanical-file separation, risk notes, and test guidance.
+- Keep this skill's fixed PR body structure. Do not use the composed skill's history-rewrite workflow unless the user separately requests or approves it.
+
 ## Performance rules
 
 - **Parallelize independent Bash calls.** Use multiple tool calls in a single response whenever commands have no data dependency.

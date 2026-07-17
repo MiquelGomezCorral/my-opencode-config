@@ -55,7 +55,7 @@ Inspect the available subagent descriptions before choosing. Do not invent agent
 - Use read-only agents for exploration, research, review, and verification whenever possible.
 - Use specialist reviewers only for dimensions relevant to the task.
 - Use a write-capable agent only when the user requested implementation.
-- Let each agent use its configured model unless a concrete reason requires an explicit `model` override. Automatic model recovery handles provider failures.
+- Let each agent use its configured model unless the user requests specific models or providers. Pass `model` for a preferred first attempt; pass `models` for the exact ordered chain. Provider restrictions such as "OpenAI only" must become an exact `models` chain, never just worker-prompt text.
 - Respect agent permissions and any instruction that restricts manual-only agents.
 
 For code review, choose from the available reviewer agents by their current descriptions and apply the specialist review playbook below.
@@ -82,6 +82,7 @@ Scope: Exact files, subsystem, question, or perspective owned by this worker.
 Exclusions: Work assigned elsewhere or explicitly out of bounds.
 Context: Relevant decisions, constraints, paths, errors, and dependency results.
 Allowed actions: Read-only, commands permitted, or isolated edits permitted.
+Models: Configured default, preferred first model, or exact ordered chain.
 Deliverable: Exact result shape and desired brevity.
 Evidence: File:line references, URLs, command output, tests, or reproduction steps required.
 Stop: Completion condition and blockers that require returning early.

@@ -19,6 +19,7 @@ description: Two-phase engineering review for correctness and conventions. Use w
 
 ## Skill Composition
 
+- In `full` and `deep` modes, load and apply `code-review` for grounding, review dimensions, and evidence standards. This skill's verdict, output format, and fix-pass rules take precedence.
 - If the diff touches `Effect`, `Layer`, `Schedule`, `Schema.TaggedErrorClass`, `ServiceMap`, `ManagedRuntime`, `createEffectTool`, or `createEffectRunner`, also load and apply the `effect` and `btca-first` skills, and use [references/effect-checks.md](references/effect-checks.md).
 - Use `effect` for repo-local conventions and `btca-first` with `effect-smol` when the review depends on current API behavior or recommended usage.
 
