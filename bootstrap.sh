@@ -176,7 +176,13 @@ install_system_dependencies() {
       install_homebrew
       brew install node openssl gh ripgrep
       if ! $SKIP_SERVICES; then
-        brew install docker docker-compose colima
+        command -v docker >/dev/null 2>&1 || brew install docker
+        if ! docker compose version >/dev/null 2>&1 && ! command -v docker-compose >/dev/null 2>&1; then
+          brew install docker-compose
+        fi
+        if ! docker info >/dev/null 2>&1 && ! command -v colima >/dev/null 2>&1; then
+          brew install colima
+        fi
       fi
       ;;
     Linux)
