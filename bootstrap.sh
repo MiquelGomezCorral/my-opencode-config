@@ -236,6 +236,7 @@ install_quota() {
   local quota_dir="$DEPS_DIR/opencode-quota"
   local tools_dir="$DEPS_DIR/tools"
   local pnpm="$tools_dir/node_modules/.bin/pnpm"
+  local -x PATH="$tools_dir/node_modules/.bin:$PATH"
 
   mkdir -p "$DEPS_DIR" "$tools_dir"
   npm install --prefix "$tools_dir" --no-save --package-lock=false "pnpm@$PNPM_VERSION"
