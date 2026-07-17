@@ -4,19 +4,22 @@ Private, versioned backup of the complete OpenCode configuration. It restores gl
 
 ## Install
 
+Prerequisite: authenticate GitHub for this private repository with SSH or another Git credential method.
+
 ```bash
 git clone git@github.com:MiquelGomezCorral/my-opencode-config.git ~/code/my-opencode-config
 cd ~/code/my-opencode-config
 ./bootstrap.sh
 ```
 
-The installer backs up conflicting managed paths with a timestamp, symlinks this repository into `~/.config/opencode` and `~/.agents`, installs pinned dependencies, builds the maintained OpenCode Quota fork, and starts the local SearXNG service.
+The installer backs up conflicting managed paths with a timestamp, symlinks managed entries into `~/.config/opencode` and `~/.agents`, installs the required CLIs, builds the maintained OpenCode Quota fork, and starts the local SearXNG service.
 
 Restart the shell after installation, then authenticate providers and remote MCP servers:
 
 ```bash
 opencode auth login
 opencode mcp auth <name>
+gh auth login
 ```
 
 Credentials and sessions are deliberately not backed up.
@@ -35,9 +38,14 @@ Existing symlinks follow repository updates immediately. Re-running the installe
 
 ```bash
 ./bootstrap.sh --check
+./bootstrap.sh --check-deps
 ```
 
 Use `--skip-deps` or `--skip-services` when system dependencies or Docker are managed separately. `--home PATH` installs into an isolated home for testing.
+
+OpenCode-facing runtimes and packages are pinned, including OpenCode, Bun, uv, BTCA, Headroom, CodeGraph, SkillSpector, MCP packages, OpenCode Quota, and the SearXNG image. Homebrew and apt install the current compatible platform toolchain packages.
+
+SearXNG binds only to loopback. Bootstrap intentionally rotates its ephemeral cookie-signing secret on rerun rather than writing a credential to disk; this configuration does not preserve SearXNG browser sessions.
 
 ## Included
 

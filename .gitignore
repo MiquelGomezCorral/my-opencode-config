@@ -1,6 +1,10 @@
 .DS_Store
 .env
 .env.*
+!.env.example
+auth.json
+mcp-auth.json
+opencode.db*
 *.backup
 *.bak
 *.log

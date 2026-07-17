@@ -16,7 +16,15 @@ jobs:
         with:
           bun-version: 1.3.2
       - run: bash -n bootstrap.sh
+      - run: bash -n tests/bootstrap.test.sh
       - run: ./bootstrap.sh --check
+      - if: runner.os == 'Linux'
+        run: shellcheck bootstrap.sh tests/bootstrap.test.sh
+      - if: runner.os == 'Linux'
+        run: SEARXNG_SECRET=ci-only docker compose -f config/searxng/compose.yml config
+      - run: bash tests/bootstrap.test.sh
+      - if: runner.os == 'macOS'
+        run: PATH=/usr/bin:/bin bash -c 'source config/opencode-env.sh; command -v node; command -v npx; command -v bun'
       - run: bun install --cwd config --frozen-lockfile
       - run: bun test config/tests/force-subagent-model.test.js
       - name: Test isolated install
@@ -31,5 +39,6 @@ jobs:
           test -L "$test_home/.config/opencode/commands"
           test -L "$test_home/.config/opencode/plugins"
           test -L "$test_home/.config/opencode/skills"
+          test -L "$test_home/.config/opencode/bun.lock"
           test -L "$test_home/.agents/skills"
           test -L "$test_home/.config/btca/btca.config.jsonc"
