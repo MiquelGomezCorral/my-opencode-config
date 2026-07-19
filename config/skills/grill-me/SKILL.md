@@ -90,6 +90,8 @@ Next question:
 ...
 ```
 
+These questions must be ask all at once, not in a separate thread, to avoid losing context and to keep the interview focused. Do them on batch / batches
+
 ## Interview Standards
 
 - Be direct about ambiguity, hidden coupling, hand-wavy success criteria, unclear ownership, and untested assumptions.
