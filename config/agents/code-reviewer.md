@@ -14,44 +14,6 @@ permission:
   edit: deny
   webfetch: allow
   bash:
-    "*": deny
-    # Git read only
-    "git diff*": allow
-    "git log*": allow
-    "git show*": allow
-    "git status*": allow
-    "git blame*": allow
-    "git branch*": allow
-    "git rev-parse*": allow      # resolving refs, finding the repo root
-    "git merge-base*": allow     # finding the divergence point for diffs
-    "git ls-files*": allow       # listing tracked files, glob-friendly
-    "git stash list*": allow     # reviewing uncommitted-but-stashed work
-    "git stash show*": allow
-    "git diff-tree*": allow      # show-changed-files for a commit
-    # GitHub PR reads
-    "gh pr view*": allow
-    "gh pr list*": allow
-    "gh label list*": allow
-    "gh pr diff*": allow         # alternative diff source if local checkout is stale
-    "gh pr checks*": allow       # CI status — informs verify-gate decisions
-    "gh issue view*": allow      # linked issues are often where the "stated problem" lives
-    "gh repo view*": allow       # repo metadata, default branch
-    # Filesystem read
-    "ls *": allow
-    "wc *": allow
-    "cat *": allow
-    "head *": allow
-    "tail *": allow
-    "find *": allow
-    "grep *": allow
-    "rg *": allow
-    "jq *": allow
-    "tree *": allow
-    "pwd": allow
-    "which *": allow             # check tool availability before running verify
-    "command -v *": allow
-    "diff *": allow              # raw file comparison
-    "realpath *": allow
     # Verify gate — test / build / lint / typecheck runners. These may write
     # build artifacts and test outputs to disk but must NOT edit source. The
     # reviewer's tools section denies write/edit/patch, which is the real guard;
@@ -192,7 +154,7 @@ Read-only access to source plus execution access to verification runners. Names 
   - `grep`, `rg` — searching the codebase
   - Project test/build/lint/typecheck commands for the verify gate
   - Project verify scripts (`bash scripts/verify.sh`, `make check`, etc.)
-  - `gh pr view/list/diff/checks`, `gh issue view`, `gh repo view`, `gh label list` — GitHub reads only
+  - `gh pr view/list/diff/checks`, `gh issue view`, `gh repo view`, `gh label list`, `gh search *`, and permitted query-only `gh api` calls — GitHub reads only
 - **`view`** — reading specific files. Prefer over `cat` for files you'll cite.
 - **`grep` / `search`** — finding patterns elsewhere. Use whenever you are about to claim "the existing pattern is X" or "there's a utility for this."
 - **`task`** (when available) — spawning sub-reviewers in parallel. See *Sub-reviewer swarm*.

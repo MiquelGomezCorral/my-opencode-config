@@ -9,15 +9,6 @@ tools:
 permission:
   edit: deny
   webfetch: allow
-  bash:
-    "*": deny
-    "git status*": allow
-    "git diff*": allow
-    "git log*": allow
-    "git show*": allow
-    "git rev-parse*": allow
-    "git merge-base*": allow
-    "git ls-files*": allow
   task:
     "*": deny
 ---
