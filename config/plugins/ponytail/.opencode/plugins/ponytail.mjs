@@ -17,6 +17,29 @@ const require = createRequire(import.meta.url);
 const { getPonytailInstructions } = require('../../hooks/ponytail-instructions');
 const { getDefaultMode, normalizePersistedMode } = require('../../hooks/ponytail-config');
 
+const commands = {
+  ponytail: {
+    description: 'Set Ponytail mode',
+    template: 'Ponytail mode: $ARGUMENTS. Confirm the selected mode in one sentence; it applies from the next message.',
+  },
+  'ponytail-review': {
+    description: 'Review the current diff for over-engineering',
+    template: 'Review the current changes for over-engineering only, not correctness. Report each deletion or simplification with its path, then the net lines removable. If nothing can be cut, say "Lean already. Ship." User context: $ARGUMENTS',
+  },
+  'ponytail-audit': {
+    description: 'Audit the repository for over-engineering',
+    template: 'Audit the entire repository for over-engineering only, not correctness. Rank deletions and simplifications by impact, include each path, then the net lines and dependencies removable. If nothing can be cut, say "Lean already. Ship." User context: $ARGUMENTS',
+  },
+  'ponytail-debt': {
+    description: 'List deliberate Ponytail shortcuts',
+    template: 'Find every `ponytail:` comment in the repository and report its path, ceiling, and upgrade trigger. Flag comments without a trigger, summarize the counts, and change nothing. User context: $ARGUMENTS',
+  },
+  'ponytail-help': {
+    description: 'Show Ponytail modes and commands',
+    template: 'Show the Ponytail reference card: modes off, lite, full, and ultra; commands /ponytail-review, /ponytail-audit, /ponytail-debt, and /ponytail-help. Change nothing.',
+  },
+};
+
 // OpenCode has no flag-file convention of its own; keep mode beside its config.
 const statePath = path.join(
   process.env.XDG_CONFIG_HOME || path.join(os.homedir(), '.config'),
@@ -43,6 +66,13 @@ export default async ({ client } = {}) => {
   };
 
   return {
+    config: async (config) => {
+      config.command ??= {};
+      for (const [name, command] of Object.entries(commands)) {
+        config.command[name] ??= command;
+      }
+    },
+
     // Append the ruleset to the system prompt every turn.
     'experimental.chat.system.transform': async (_input, output) => {
       const mode = readMode();

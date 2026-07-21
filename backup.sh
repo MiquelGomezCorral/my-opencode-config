@@ -36,12 +36,12 @@ git diff
 ./bootstrap.sh --check
 
 git add \
+  .agents \
   backup.sh \
   bootstrap.sh \
   README.md \
   config/AGENTS.md \
   config/security-rules.md \
-  config/surgical-rules.md \
   config/tui.json \
   config/warmup.sh \
   config/opencode.json \

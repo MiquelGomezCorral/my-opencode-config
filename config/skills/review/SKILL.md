@@ -1,13 +1,13 @@
 ---
 name: review
-description: Two-phase engineering review for correctness and conventions. Use when the user asks for a code review, quality gate, staff review, or convention audit of current diffs.
+description: Two-phase correctness and convention gate. Use when the user explicitly asks for a staff review, quality gate, convention audit, or `full`/`quick`/`deep` review mode. Use `code-review` alone for ordinary code review.
 ---
 
 # Review Gate
 
 ## When to use
 
-- User asks for "review", "audit", or "quality gate".
+- User asks for a staff review, convention audit, or named review mode.
 - You need a rigorous diff review before merge.
 - You need conventions checks plus optional auto-fixes.
 
@@ -20,8 +20,7 @@ description: Two-phase engineering review for correctness and conventions. Use w
 ## Skill Composition
 
 - In `full` and `deep` modes, load and apply `code-review` for grounding, review dimensions, and evidence standards. This skill's verdict, output format, and fix-pass rules take precedence.
-- If the diff touches `Effect`, `Layer`, `Schedule`, `Schema.TaggedErrorClass`, `ServiceMap`, `ManagedRuntime`, `createEffectTool`, or `createEffectRunner`, also load and apply the `effect` and `btca-first` skills, and use [references/effect-checks.md](references/effect-checks.md).
-- Use `effect` for repo-local conventions and `btca-first` with `effect-smol` when the review depends on current API behavior or recommended usage.
+- If the diff touches `Effect`, `Layer`, `Schedule`, `Schema.TaggedErrorClass`, `ServiceMap`, `ManagedRuntime`, `createEffectTool`, or `createEffectRunner`, use [references/effect-checks.md](references/effect-checks.md). Load `btca-first` only when current Effect API behavior must be verified and `effect-smol` is available in the live BTCA catalog.
 
 ## Workflow
 
@@ -51,10 +50,10 @@ description: Two-phase engineering review for correctness and conventions. Use w
   - Naming and JSDoc conventions.
   - Dead code (`bunx knip --reporter compact`) when relevant.
 
-4. Fix pass (only if requested):
-- Ask whether to fix all, a category, or skip.
-- Apply approved fixes.
-- Run `bun typecheck` and `bun format` as **separate Bash calls** (turborepo's TUI hangs when chained with `&&`).
+4. Fix pass (only if separately requested or already authorized by the implementation task):
+- In review-only mode, report findings without editing.
+- During an already authorized implementation, fix blocking in-scope findings without another confirmation.
+- Run the relevant repository-defined checks, respecting any documented non-interactive runner constraints.
 
 ## Output format
 

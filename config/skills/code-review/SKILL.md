@@ -7,7 +7,7 @@ description: Use when reviewing code changes — pull requests, git diffs, uncom
 
 A methodology for reviewing code changes well. Usable by humans and agents.
 
-This skill is grounded in Google's *What to Look for in a Code Review* (eng-practices), the *Conventional Comments* specification, and Anthropic's context-engineering guidance for AI agents. Full citations in `references/sources.md`.
+This skill is grounded in Google's code-review guidance, the Conventional Comments specification, and Anthropic's context-engineering guidance for AI agents.
 
 The skill exists because most code review failure modes are predictable. The reviewer rubber-stamps, the reviewer nitpicks, the reviewer hallucinates patterns that don't exist, the reviewer misses the actual bug while flagging the formatting. This skill makes those failures harder to commit.
 
@@ -267,10 +267,10 @@ A partial review with explicit gaps is more useful than a complete-looking revie
 
 ## References
 
-See `references/sources.md` for full citations. Primary sources:
+Primary sources:
 
-- Google, *What to Look for in a Code Review* (eng-practices)
-- Google, *The Standard of Code Review* (eng-practices)
-- *Conventional Comments* specification (conventionalcomments.org)
-- Anthropic, *Effective Context Engineering for AI Agents*
-- *Software Engineering at Google* (Winters, Manshreck, Wright), Chapter 9
+- Google, [What to Look for in a Code Review](https://google.github.io/eng-practices/review/reviewer/looking-for.html)
+- Google, [The Standard of Code Review](https://google.github.io/eng-practices/review/reviewer/standard.html)
+- [Conventional Comments](https://conventionalcomments.org/)
+- Anthropic, [Effective Context Engineering for AI Agents](https://www.anthropic.com/engineering/effective-context-engineering-for-ai-agents)
+- [Software Engineering at Google, Chapter 9](https://abseil.io/resources/swe-book/html/ch09.html)

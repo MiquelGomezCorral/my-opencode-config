@@ -30,8 +30,8 @@ description: Stage changes, create a conventional commit, push the branch, and c
 
 ## Performance rules
 
-- **Parallelize independent Bash calls.** Use multiple tool calls in a single response whenever commands have no data dependency.
-- **Never chain turbo commands with `&&`.** `bun typecheck` uses turborepo whose TUI hangs in non-interactive shells. Run each command as its own Bash call.
+- Parallelize independent read-only inspection and verification commands.
+- Respect repository guidance when a runner requires separate non-interactive calls.
 
 ## Workflow
 
@@ -45,25 +45,23 @@ description: Stage changes, create a conventional commit, push the branch, and c
 
 3. **Stage changes precisely**: prefer `git add <files>` over blanket staging. Never stage secrets or `.env` files.
 
-4. **Validation gate** — each command as a separate Bash call:
-   - Shipped work: `bun typecheck`, `bun run typecheck:safety`, `bun format` (parallel). Stop on any failure.
-   - WIP checkpoint: `bun run typecheck:safety` only. Stop on failure.
+4. **Validation gate**:
+   - Read the repository's `AGENTS.md`, package scripts, and CI configuration to identify the named checks.
+   - Run the smallest checks that prove the staged change is ready. Stop on any failure.
+   - For a WIP checkpoint, run only the cheapest repository-defined safety check that supports the claim.
 
 5. **Commit**:
-   - Follow conventional commits from `docs/conventions/commits.md`.
+   - Follow the repository's commit convention; fall back to Conventional Commits when none exists.
    - Hook failure handling and signals: see [references/hook-failures.md](references/hook-failures.md).
-   - Sandbox write denial during commit: see [references/sandbox-escalation.md](references/sandbox-escalation.md).
 
 6. **Push**: push branch and set upstream when needed.
 
 7. **Draft PR metadata** (shipped work only):
    - Analyze recent commits and any existing PR metadata.
    - Draft a conventional title from the dominant commit type/scope, with a subject that describes the product outcome.
-   - Draft a body using the fixed structure shared by every author: `Brief` → `Product Summary` → `Verification` → `Technical Notes`, with an optional `Evidence` section for data-validated changes. This mirrors `.github/PULL_REQUEST_TEMPLATE.md`.
-   - Always emit the four fixed sections in order regardless of change type; never substitute ad-hoc headings (`Problem`, `Fix`, `Goal`). Bugfix narrative goes inside `Technical Notes` as Problem → Root cause → Fix.
+   - Follow `.github/PULL_REQUEST_TEMPLATE.md` when it exists. Otherwise use `Summary` → `Verification` → `Risks` and omit empty sections.
    - Ground customer-facing claims in user-provided brief context, existing PR metadata, conversation context, commits, and diff summary.
    - If launch context is unavailable, write `Not provided` or `None`; do not invent positioning.
-   - Body structure and section guidance: see [references/pr-body-template.md](references/pr-body-template.md), kept in sync with `.github/PULL_REQUEST_TEMPLATE.md`.
    - Include a commit list only when commit history adds useful review context.
 
 8. **PR handling** (shipped work only):

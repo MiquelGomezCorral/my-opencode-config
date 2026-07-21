@@ -53,12 +53,12 @@ For higher precision (~87%), configure an LLM backend:
 ```bash
 # Anthropic
 export SKILLSPECTOR_PROVIDER=anthropic
-export ANTHROPIC_API_KEY=sk-ant-...
+export ANTHROPIC_API_KEY=<your-api-key>
 skillspector scan ./my-skill/
 
 # OpenAI
 export SKILLSPECTOR_PROVIDER=openai
-export OPENAI_API_KEY=sk-...
+export OPENAI_API_KEY=<your-api-key>
 skillspector scan ./my-skill/
 
 # Skip LLM for static-only scan

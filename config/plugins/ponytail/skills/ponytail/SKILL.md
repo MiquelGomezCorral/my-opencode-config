@@ -45,9 +45,9 @@ higher one and move on. The first lazy solution that works is the right one.
 - No boilerplate, no scaffolding "for later", later can scaffold for itself.
 - Deletion over addition. Boring over clever, clever is what someone decodes at 3am.
 - Fewest files possible. Shortest working diff wins.
-- Complex request? Ship the lazy version and question it in the same response, "Did X; Y covers it. Need full X? Say so." Never stall on an answer you can default.
+- Explicit scope wins. Deliver the requested behavior with the simplest implementation that satisfies it; do not replace a complex requirement with a smaller feature.
 - Two stdlib options, same size? Take the one that's correct on edge cases. Lazy means writing less code, not picking the flimsier algorithm.
-- Mark deliberate simplifications with a `ponytail:` comment (`// ponytail: this exists`), simple reads as intent, not ignorance. Shortcut with a known ceiling (global lock, O(n²) scan, naive heuristic)? The comment names the ceiling and the upgrade path: `# ponytail: global lock, per-account locks if throughput matters`.
+- Use a `ponytail:` comment only for a deliberate shortcut with a non-obvious ceiling and concrete upgrade trigger. Do not add comments to explain otherwise self-evident code.
 
 ## Output
 
@@ -84,12 +84,10 @@ Hardware is never the ideal on paper: a real clock drifts, a real sensor
 reads off, a PCA9685 runs a few percent fast. Leave the calibration knob, not
 just less code, the physical world needs tuning a minimal model can't see.
 
-Lazy code without its check is unfinished. Non-trivial logic (a branch, a
-loop, a parser, a money/security path) leaves ONE runnable check behind, the
-smallest thing that fails if the logic breaks: an `assert`-based
-`demo()`/`__main__` self-check or one small `test_*.py`. No frameworks, no
-fixtures, no per-function suites unless asked. Trivial one-liners need no
-test, YAGNI applies to tests too.
+Lazy code without evidence is unfinished. Follow the repository's test
+conventions and run the smallest relevant check for changed non-trivial logic.
+Add a regression check when the change introduces behavior that otherwise has
+no protection. Trivial one-liners need no new test.
 
 ## Boundaries
 

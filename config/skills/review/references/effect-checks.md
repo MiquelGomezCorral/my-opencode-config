@@ -1,9 +1,9 @@
 # Effect Review Checks
 
-Apply these checks when the reviewed diff touches Effect code. Load the `effect` and `btca-first` skills first.
+Apply these checks when the reviewed diff touches Effect code. Load `btca-first` only when current upstream guidance is needed and `effect-smol` exists in the live resource catalog.
 
 1. **Use `btca` before asserting current `effect-smol` guidance** — Run `btca ask -r effect-smol -q "..."` before judging current API usage, recommended composition, or preferred patterns that may have changed upstream.
-2. **Use repo patterns for repo-local conventions** — After `btca`, compare the answer against local patterns from the `effect` skill and nearby code. If repo behavior and `btca` disagree, report the mismatch explicitly instead of guessing.
+2. **Use repo patterns for repo-local conventions** — Compare upstream guidance against nearby code and project instructions. If repo behavior and external guidance disagree, report the mismatch explicitly instead of guessing.
 3. **Prefer repo-standard Effect composition** — Flag custom wrappers when the repo already has a clear `Effect.fn`, `Effect.gen`, `createEffectTool`, or `createEffectRunner` pattern.
 4. **Prefer typed error channels** — Flag promise-style error handling or untyped throws where `Schema.TaggedErrorClass`, `Effect.try`, or `Effect.tryPromise` should carry the failure.
 5. **Prefer runtime injection via services and layers** — Flag ad hoc closures or inline dependency wiring when `ServiceMap.Service` and `Layer` are the established pattern.

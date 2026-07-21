@@ -5,7 +5,7 @@ description: Source-first SDK and framework research with btca. Use when a task 
 
 # btca-first
 
-Use this skill when the task depends on current external-library behavior, recommended integration patterns, or SDK capability checks. In this repo, `btca` is the default source-first workflow for `ai`, `cloudflare`, `cloudflare-ai-chat`, `effect-smol`, `posthog`, `autoevals`, `braintrust-sdk-javascript`, and related cross-resource questions.
+Use this skill when the task depends on current external-library behavior, recommended integration patterns, or SDK capability checks. BTCA resources vary by project and may change between sessions, so discover the live catalog before choosing names.
 
 ## When to use
 
@@ -14,21 +14,12 @@ Use this skill when the task depends on current external-library behavior, recom
 - The task spans more than one vendor boundary, such as AI SDK plus Cloudflare Workers
 - You need evidence from source repositories before implementing or reviewing code
 
-## Resource Map
+## Resource Selection
 
-| Topic | btca resources |
-|------|----------------|
-| AI SDK, tools, streaming, structured outputs | `ai` |
-| Workers, R2, Queues, Workflows, Durable Objects | `cloudflare` |
-| Cloudflare AI Chat package source | `cloudflare-ai-chat` |
-| Effect patterns and examples | `effect-smol` |
-| Analytics, telemetry, feature flags, tracing | `posthog` |
-| Braintrust evaluation scorers and model-graded evals | `autoevals` |
-| Braintrust TypeScript SDKs, eval runners, and tracing integrations | `braintrust-sdk-javascript` |
-| Cloudflare agent architecture examples | `agents-starter` |
-| URL query state in React and Next.js | `nuqs` |
-
-Use multiple resources when the question crosses boundaries.
+1. Call `btca_listResources` or run `btca status` to inspect resources available in the current project.
+2. Use only names returned by the live catalog. Common project resources may include `ai`, `cloudflare`, `effect-smol`, `posthog`, `autoevals`, `braintrust-sdk-javascript`, `nextjs`, `svelte`, and `tailwindcss`, but none are globally guaranteed.
+3. Use an HTTPS Git URL or `npm:<package>` reference for a one-off source that is not configured locally.
+4. Use multiple resources only when the question crosses real boundaries.
 
 ## CLI Baseline
 
@@ -46,7 +37,7 @@ btca ask -r <resource> -q "<question>"
 
 ## Workflow
 
-1. If BTCA availability is unclear, run `btca status`.
+1. Inspect the live resource catalog unless the exact resource was already verified this session.
 2. Identify the concrete question that needs fresh documentation.
 3. Choose the narrowest relevant `btca` resources.
 4. Run `btca ask -r ... -q ...` before relying on memory.

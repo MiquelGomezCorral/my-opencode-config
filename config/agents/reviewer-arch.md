@@ -5,8 +5,6 @@ model: openai/gpt-5.6-terra
 reasoningEffort: medium
 temperature: 0.1
 steps: 10
-tools:
-  webfetch: true
 permission:
   edit: deny
   webfetch: allow

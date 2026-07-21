@@ -38,6 +38,19 @@ test('system.transform injects the ruleset at the default mode (full)', async ()
   assert.match(system[0], /lazy senior developer/);
 });
 
+test('config registers every Ponytail command', async () => {
+  const hooks = await loadPlugin({});
+  const config = {};
+  await hooks.config(config);
+  assert.deepEqual(
+    Object.keys(config.command).sort(),
+    ['ponytail', 'ponytail-audit', 'ponytail-debt', 'ponytail-help', 'ponytail-review'],
+  );
+  for (const command of Object.values(config.command)) {
+    assert.doesNotMatch(command.template, /Load `ponytail-/);
+  }
+});
+
 test('command.execute.before persists /ponytail ultra, transform follows it', async () => {
   const hooks = await loadPlugin({});
   await hooks['command.execute.before']({ command: 'ponytail', arguments: 'ultra', sessionID: 's' });

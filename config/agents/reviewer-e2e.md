@@ -4,8 +4,6 @@ mode: subagent
 model: openai/gpt-5.5
 temperature: 0.1
 steps: 12
-tools:
-  webfetch: true
 permission:
   edit: deny
   webfetch: allow
@@ -23,7 +21,7 @@ Use context surgically. Start from the diff, then inspect only the smallest affe
 - **Public API / contract changes**: signatures, return types, thrown errors, response shapes, config keys, CLI flags. Anything that consumers depend on.
 - **Breaking changes**: behavioral changes that compile but break callers semantically (e.g. function now throws instead of returning null).
 - **Integration points**: DB migrations, queue messages, HTTP endpoints, external services, env vars, file system. Are they consistent end-to-end?
-- **Migration / upgrade paths**: if this is a breaking change, is there a migration story? Backwards compat?
+- **Migration / upgrade paths**: when persisted data, shipped behavior, or external consumers require compatibility, is there a concrete migration path?
 - **Side effects**: logging, metrics, caches, feature flags, side files. Are they updated coherently?
 - **Tests and fixtures**: do existing tests still cover the new behavior? Are new tests needed for new branches?
 - **Documentation drift**: README, OpenAPI, type definitions, comments that now lie.

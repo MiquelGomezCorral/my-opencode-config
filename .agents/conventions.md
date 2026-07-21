@@ -6,7 +6,7 @@ Use portable Bash with `set -euo pipefail`. Keep configuration changes minimal a
 
 ## Naming
 
-Use OpenCode's plural global directories: `agents`, `commands`, `plugins`, and `skills`.
+Use OpenCode's plural directories: `agents`, `commands`, `plugins`, and `skills`. Keep reusable skills in `config/skills`, cross-agent skills in `agent-home/skills`, and repository-only skills in `.agents/skills`.
 
 ## Imports
 
@@ -14,4 +14,4 @@ Use `{env:HOME}` in OpenCode JSON and `$HOME` in shell-backed command files. Nev
 
 ## Tests
 
-Run `bash -n bootstrap.sh`, `./bootstrap.sh --check`, existing plugin tests, and an isolated-home bootstrap before publishing.
+Run `bash -n bootstrap.sh backup.sh`, `./bootstrap.sh --check`, existing plugin tests, skill inventory validation, and an isolated-home bootstrap before publishing.

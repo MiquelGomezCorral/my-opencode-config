@@ -55,5 +55,5 @@ When code behavior should stay untouched, prefer PR description and review notes
 ## Guardrails
 
 - Never hide meaningful behavior changes inside "cleanup".
-- Do not bypass hooks unless the user explicitly asks.
+- Never bypass hooks. Fix the failure or report the blocker.
 - If the PR is too large to make reviewable with notes, recommend splitting instead of polishing around the problem.

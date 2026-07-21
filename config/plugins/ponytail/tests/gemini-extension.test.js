@@ -30,7 +30,7 @@ const REUSED_SKILLS = ['skills/ponytail/SKILL.md'];
 const RULE_INVARIANTS = [
   'lazy senior',
   'input validation at trust boundaries',
-  'naive heuristic',
+  'concrete upgrade trigger',
 ];
 
 function read(relPath) {

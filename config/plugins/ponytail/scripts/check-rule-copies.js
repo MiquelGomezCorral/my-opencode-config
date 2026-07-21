@@ -40,11 +40,11 @@ for (const [relPath, normalize] of copies) {
 // a rule's wording trips this, which is the reminder to propagate it everywhere.
 // Upgrade path: generate the copies from SKILL.md if this ever misses a real drift.
 const INVARIANTS = [
-  'naive heuristic',                       // ceiling-comment rule
-  'ONE runnable check',                    // test reflex
+  'concrete upgrade trigger',              // ceiling-comment rule
+  'Add a regression check',                // project-native verification
   'flimsier algorithm',                    // robust-variant rule
   'input validation at trust boundaries',  // the "not lazy about" clause
-  'Lazy code without its check is unfinished', // one-check promoted to headline
+  'Lazy code without evidence is unfinished', // verification promoted to headline
 ];
 
 const skill = read('skills/ponytail/SKILL.md');

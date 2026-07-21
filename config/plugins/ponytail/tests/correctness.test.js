@@ -74,13 +74,13 @@ test('debounce: immediate-call implementation fails', () => {
 
 // --- CSV sum ---
 
-test('csv: correct pandas one-liner passes', () => {
+test('csv: correct stdlib implementation passes', () => {
   const result = check(
     "Write Python code that reads sales.csv and sums the 'amount' column.",
     'python',
-    `import pandas as pd
-df = pd.read_csv('sales.csv')
-print(df['amount'].sum())`,
+    `import csv
+with open('sales.csv', newline='') as file:
+    print(sum(float(row['amount']) for row in csv.DictReader(file)))`,
   );
   assert.equal(result.pass, true);
   assert.equal(result.score, 1);

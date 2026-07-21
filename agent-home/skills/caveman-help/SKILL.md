@@ -21,7 +21,7 @@ Display this reference card when invoked. One-shot — do NOT change mode, write
 | **Wenyan-Full** | `/caveman wenyan` | Full 文言文. Maximum classical terseness. |
 | **Wenyan-Ultra** | `/caveman wenyan-ultra` | Extreme. Ancient scholar on a budget. |
 
-Mode stick until changed or session end.
+Mode sticks in the current conversation after the `caveman` skill is loaded.
 
 ## Skills
 
@@ -35,24 +35,6 @@ Mode stick until changed or session end.
 ## Deactivate
 
 Say "stop caveman" or "normal mode". Resume anytime with `/caveman`.
-
-## Configure Default Mode
-
-Default mode = `full`. Change it:
-
-**Environment variable** (highest priority):
-```bash
-export CAVEMAN_DEFAULT_MODE=ultra
-```
-
-**Config file** (`~/.config/caveman/config.json`):
-```json
-{ "defaultMode": "lite" }
-```
-
-Set `"off"` to disable auto-activation on session start. User can still activate manually with `/caveman`.
-
-Resolution: env var > config file > `full`.
 
 ## More
 

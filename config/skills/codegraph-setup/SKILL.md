@@ -5,14 +5,11 @@ description: "CodeGraph MCP server setup — install, index, and configure seman
 
 # CodeGraph Setup
 
-Check if codegraph is installed (`which codegraph`). If not, tell user to install:
-```bash
-npm install -g @colbymchenry/codegraph
-```
+Check whether CodeGraph is installed with `command -v codegraph`. In this managed OpenCode setup, install or repair it through `bootstrap.sh`; do not run `codegraph install`, because `opencode.json` already owns the MCP configuration. On an unmanaged machine, follow the official installer.
 
-Index the current project:
+Initialize the current project:
 ```bash
-codegraph init -i
+codegraph init
 ```
 
 ## MCP config
@@ -29,14 +26,10 @@ On macOS with Homebrew: `/opt/homebrew/bin/codegraph serve --mcp`
 
 ## MCP tools
 
-- **symbol_search**: search for symbols by name/pattern
-- **context**: get surrounding context for a symbol
-- **explore**: explore the codebase structure
-- **callers**: find callers of a function/method
-- **callees**: find callees of a function/method
+- **codegraph_explore**: returns relevant source, call paths, and impact context in one response. It is the only tool exposed by default.
 
 ## After indexing
 
-- Run `codegraph sync` for incremental updates going forward.
-- Restart opencode if this is the first index so MCP tools are picked up.
-- MCP tools are auto-loaded when `.codegraph/` directory exists in the project root.
+- The watcher keeps the graph current after initialization. Use `codegraph sync` only when the watcher is disabled or a script needs an explicit incremental update.
+- Restart OpenCode if this is the first index so the MCP server exposes `codegraph_explore` for the project.
+- Without a `.codegraph/` directory, the MCP server exposes no tools.

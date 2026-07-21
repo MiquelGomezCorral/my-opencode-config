@@ -1,15 +1,15 @@
 ---
 name: cleanup
-description: Post-implementation cleanup gate for current diffs. Use after the agent completes a coding task, bug fix, refactor, or review fix and needs an individual pass to avoid unnecessary type declarations, remove redundant code, and delete legacy or obsolete code before final verification.
+description: Post-implementation cleanup gate for non-trivial or visibly AI-generated diffs. Use before final verification to remove unnecessary type declarations, redundant code, and obsolete paths without broad refactoring.
 ---
 
 # Post Task Cleanup
 
 ## When to use
 
-- Post-implementation, before final verification — after a coding task, bug fix, refactor, or review fix.
+- Post-implementation, before final verification, when the diff is non-trivial or shows cleanup risk.
 - The current task diff needs a focused cleanup pass for unnecessary type declarations, redundant code, and legacy code.
-- Before claiming work is complete and ready to ship.
+- Skip trivial one-line changes that have nothing to simplify.
 
 ## Overview
 
@@ -36,12 +36,11 @@ Run this skill after implementation work and before the final response. Treat it
 - Make the smallest code changes that satisfy each pass.
 - Prefer deleting code over preserving compatibility layers when there is no live caller.
 - Do not add abstractions unless they remove meaningful duplication already present in the task diff.
-- Do not add, update, or run tests unless the user explicitly requested test work.
+- Add or update the smallest regression check required by changed non-trivial logic; otherwise do not broaden test scope during cleanup.
 
 4. Verify only what supports the final claim:
 - Run the relevant repo verification commands before claiming the cleanup is complete.
-- In this repo, the normal completion gate is `bun typecheck` and `bun format`. Run them as **separate Bash calls**, never chained with `&&` — turborepo's TUI hangs in non-interactive shells. See `.agents/skills/commit-push-pr/SKILL.md` for the rule.
-- If the cleanup touches studio agent domain-modeling code, also run `bun run typecheck:studio-domain`.
+- Run known repository checks as separate Bash calls when the runner hangs in non-interactive shells. See the `commit-push-pr` skill for repository-specific guidance.
 - Read the full output and only report success when the commands confirm it.
 
 ## Pass 1: Avoid Type Declarations

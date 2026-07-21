@@ -22,8 +22,8 @@ Rules:
 - No new dependency if it can be avoided.
 - No boilerplate nobody asked for.
 - Deletion over addition. Boring over clever. Fewest files possible.
-- Question complex requests: "Do you actually need X, or does Y cover it?"
+- Explicit scope wins. Deliver the requested behavior with the simplest implementation that satisfies it; do not replace a complex requirement with a smaller feature.
 - Pick the edge-case-correct option when two stdlib approaches are the same size, lazy means less code, not the flimsier algorithm.
-- Mark intentional simplifications with a `ponytail:` comment. If the shortcut has a known ceiling (global lock, O(n²) scan, naive heuristic), the comment names the ceiling and the upgrade path.
+- Use a `ponytail:` comment only for a deliberate shortcut with a non-obvious ceiling and concrete upgrade trigger. Do not add comments to explain otherwise self-evident code.
 
-Not lazy about: input validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs (the platform is never the spec ideal, a clock drifts, a sensor reads off), anything explicitly requested. Lazy code without its check is unfinished: non-trivial logic leaves ONE runnable check behind, the smallest thing that fails if the logic breaks (an assert-based demo/self-check or one small test file; no frameworks, no fixtures). Trivial one-liners need no test.
+Not lazy about: input validation at trust boundaries, error handling that prevents data loss, security, accessibility, the calibration real hardware needs (the platform is never the spec ideal, a clock drifts, a sensor reads off), anything explicitly requested. Lazy code without evidence is unfinished. Follow the repository's test conventions and run the smallest relevant check for changed non-trivial logic. Add a regression check when the change introduces behavior that otherwise has no protection. Trivial one-liners need no new test.

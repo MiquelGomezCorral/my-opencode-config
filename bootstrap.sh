@@ -53,7 +53,7 @@ BTCA_TARGET="${XDG_CONFIG_HOME:-$HOME/.config}/btca"
 DEPS_DIR="$HOME/.local/share/my-opencode-config/deps"
 BACKUP_SUFFIX="backup-$(date +%Y%m%d-%H%M%S)"
 CONFIG_ENTRIES=(
-  opencode.json tui.json AGENTS.md security-rules.md surgical-rules.md
+  opencode.json tui.json AGENTS.md security-rules.md
   warmup.sh package.json bun.lock opencode-env.sh agents commands
   plugins skills tests searxng opencode-quota
 )
@@ -273,6 +273,9 @@ install_config() {
   local entry
 
   mkdir -p "$CONFIG_TARGET" "$AGENT_TARGET" "$BTCA_TARGET"
+  if [[ -L "$CONFIG_TARGET/surgical-rules.md" && "$(readlink "$CONFIG_TARGET/surgical-rules.md")" == "$CONFIG_SOURCE/surgical-rules.md" ]]; then
+    rm "$CONFIG_TARGET/surgical-rules.md"
+  fi
   if [[ -L "$CONFIG_TARGET/package-lock.json" && "$(readlink "$CONFIG_TARGET/package-lock.json")" == "$CONFIG_SOURCE/package-lock.json" ]]; then
     rm "$CONFIG_TARGET/package-lock.json"
   fi

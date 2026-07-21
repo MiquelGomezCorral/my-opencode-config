@@ -101,7 +101,7 @@ Objective length: 2,914 characters
 Before returning a final `/goal`, run this skill's validator:
 
 ```bash
-python3 .agents/skills/goalcraft/scripts/validate_goal.py --strict-target --target-chars 3400 <file-containing-goal>
+python3 "$HOME/.config/opencode/skills/goalcraft/scripts/validate_goal.py" --strict-target --target-chars 3400 <file-containing-goal>
 ```
 
 The validator strips a leading `/goal` and counts only the objective text. If the objective exceeds the target, compress and re-run validation.

@@ -51,6 +51,7 @@ SearXNG binds only to loopback. Bootstrap intentionally rotates its ephemeral co
 
 - `config/`: canonical `~/.config/opencode` files and directories.
 - `agent-home/`: canonical global agent-compatible skills from `~/.agents`.
+- `.agents/`: project memory and project-only skills for this repository.
 - `tool-config/`: non-secret configuration for OpenCode's supporting CLIs.
 - `bootstrap.sh`: idempotent macOS and Ubuntu/Debian installer.
 

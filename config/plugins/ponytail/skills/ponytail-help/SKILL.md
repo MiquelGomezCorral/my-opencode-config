@@ -16,8 +16,8 @@ write flag files, or persist anything.
 | Level | Trigger | What change |
 |-------|---------|-------------|
 | **Lite** | `/ponytail lite` | Build what's asked, name the lazier alternative in one line. |
-| **Full** | `/ponytail` | The ladder enforced: YAGNI → stdlib → native → one line → minimum. Default. |
-| **Ultra** | `/ponytail ultra` | YAGNI extremist. Deletion before addition. Challenges requirements before building. |
+| **Full** | `/ponytail` | The ladder enforced: YAGNI → stdlib → native → installed dependency → one line → minimum. Default. |
+| **Ultra** | `/ponytail ultra` | YAGNI extremist. Deletion before addition while preserving explicit scope. |
 
 Level sticks until changed or session end.
 
@@ -27,11 +27,11 @@ Level sticks until changed or session end.
 |-------|---------|--------------|
 | **ponytail** | `/ponytail` | Lazy mode itself. Simplest solution that works. |
 | **ponytail-review** | `/ponytail-review` | Over-engineering review: `L42: yagni: factory, one product. Inline.` |
+| **ponytail-audit** | `/ponytail-audit` | Repository-wide over-engineering audit. |
+| **ponytail-debt** | `/ponytail-debt` | List deliberate shortcuts and their upgrade triggers. |
 | **ponytail-help** | `/ponytail-help` | This card. |
 
-Codex uses `@ponytail`, `@ponytail-review`, and `@ponytail-help`; Claude Code
-and OpenCode use the slash-command forms above (OpenCode ships `/ponytail` and
-`/ponytail-review`).
+OpenCode registers all slash-command forms above through the Ponytail plugin.
 
 ## Deactivate
 

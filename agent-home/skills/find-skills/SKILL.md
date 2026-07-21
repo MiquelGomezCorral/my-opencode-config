@@ -70,6 +70,7 @@ For example:
 1. **Install count** — Prefer skills with 1K+ installs. Be cautious with anything under 100.
 2. **Source reputation** — Official sources (`vercel-labs`, `anthropics`, `microsoft`) are more trustworthy than unknown authors.
 3. **GitHub stars** — Check the source repository. A skill from a repo with <100 stars should be treated with skepticism.
+4. **Security scan** — Load `skillspector` and scan the source before recommending installation. Inspect matched lines; do not treat every static match as a confirmed vulnerability.
 
 ### Step 5: Present Options to the User
 
@@ -95,7 +96,7 @@ Learn more: https://skills.sh/vercel-labs/agent-skills/react-best-practices
 
 ### Step 6: Offer to Install
 
-If the user wants to proceed, you can install the skill for them:
+Install only after the user explicitly asks to proceed and the security review is acceptable:
 
 ```bash
 npx skills add <owner/repo@skill> -g -y

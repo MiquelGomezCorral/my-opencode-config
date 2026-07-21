@@ -5,8 +5,6 @@ model: opencode-go/deepseek-v4-flash
 reasoningEffort: medium
 temperature: 0.1
 steps: 5
-tools:
-  webfetch: true
 permission:
   edit: deny
   webfetch: allow

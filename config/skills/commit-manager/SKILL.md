@@ -13,7 +13,7 @@ Groups changes by purpose, NOT by file. One commit = one logical change.
 2. Never mix unrelated changes in the same commit.
 3. Prefer many small coherent commits over one large commit.
 4. Each commit must be independently understandable and reversible.
-5. Use `git add -p` for partial staging when a file contains multiple logical changes.
+5. Stage explicit paths non-interactively. If one file mixes unrelated changes that cannot be split safely, ask one focused question instead of using interactive `git add -p`.
 6. Strip all Jupyter notebook outputs before staging `.ipynb` files — run `jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace <file>` or `nbstripout <file>` on each notebook.
 
 ## Commit order
@@ -48,8 +48,8 @@ Types:
 ## Workflow
 
 1. Run `git status` and `git diff` to see all changes.
-2. Present a plan: list proposed commit groups with their files/changes.
-3. Ask user to confirm or adjust the plan.
+2. Treat an explicit `/commit` or commit request as authorization to create the required commits.
+3. Present the grouping plan only when there are multiple groups or genuine ambiguity; ask only when the correct grouping cannot be inferred safely.
 4. Before staging `.ipynb` files, strip outputs with `jupyter nbconvert --ClearOutputPreprocessor.enabled=True --inplace <file>` or `nbstripout <file>`.
 5. Stage and commit each group sequentially.
 6. Never commit secrets, env files, or large binaries.

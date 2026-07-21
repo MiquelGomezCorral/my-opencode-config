@@ -4,7 +4,7 @@ Quick-reference card. One shot, no mode change.
 
 ## What it does
 
-Prints a cheat sheet of all caveman modes, sibling skills, deactivation triggers, and how to set the default mode via env var or config file. One-shot display — does not flip the active mode, write flag files, or persist anything. Use when you forget the slash commands.
+Prints a cheat sheet of Caveman modes, sibling skills, and deactivation triggers. One-shot display; it does not change the active mode or persist anything.
 
 ## How to invoke
 
@@ -26,7 +26,7 @@ Modes:
 Skills:
   /caveman-commit       terse Conventional Commits
   /caveman-review       one-line PR comments
-  /caveman-stats        session token savings
+  /caveman-compress     compress a memory file
 
 Deactivate:
   "stop caveman" or "normal mode"

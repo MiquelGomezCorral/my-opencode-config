@@ -6,11 +6,10 @@ description: "Python project setup and management using the MiquelGomezCorral te
 # Python Project Setup & Management (MiquelGomezCorral Template)
 
 ## WHEN TO USE THIS SKILL
-Any time you are working with a Python project. ALWAYS: executions, refactoring, coding, solving dependencies.
+Use only for the MiquelGomezCorral template or explicit environment, dependency, editable-install, Jupyter-kernel, and scaffolding work. Ordinary Python coding follows the current repository's own tooling and conventions.
 
 Read this file whenever the user asks to:
-- Execute commands in an existing Python project
-- Modify imports or project structure / refactor
+- Set up or repair the environment for an existing template-based Python project
 - Create a new Python project or scaffold a project structure
 - Set up a virtual environment or conda environment for a project
 - Install dependencies with `uv` or manage `requirements.txt`

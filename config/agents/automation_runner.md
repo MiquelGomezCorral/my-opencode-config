@@ -5,7 +5,19 @@ model: opencode-go/big-pickle
 permission:
   read: allow
   edit: allow
-  bash: allow
+  bash:
+    "*": allow
+    "rm *": ask
+    "dd *": ask
+    "*git*commit*": deny
+    "*git*push*": deny
+    "*gh *": deny
+  "sequential-thinking_*": allow
+  "btca_*": allow
+  "headroom_*": allow
+  "playwright_browser_*": allow
+  "searxng_*": allow
+  "vidext-operator-*": allow
 ---
 
 You are a specialized automation execution agent, separate from any coding workflow.
@@ -21,4 +33,4 @@ Rules:
 - If a required tool or env var is missing, note it clearly and continue with what's available
 - Structure your output exactly as the playbook's Output Format section defines
 
-Always try to log what you did / discovered and add a TL;DR
+Return only the playbook's requested evidence and output structure.
