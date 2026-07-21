@@ -18,9 +18,11 @@ source "$REPO_ROOT/bootstrap.sh"
 
 mkdir -p "$CONFIG_TARGET"
 ln -s "$CONFIG_SOURCE/package-lock.json" "$CONFIG_TARGET/package-lock.json"
+ln -s "$CONFIG_SOURCE/surgical-rules.md" "$CONFIG_TARGET/surgical-rules.md"
 SKIP_DEPS=true
 install_config
 [[ ! -L "$CONFIG_TARGET/package-lock.json" ]]
+[[ ! -L "$CONFIG_TARGET/surgical-rules.md" ]]
 
 COMMAND_LOG="$TEST_HOME/commands.log"
 
