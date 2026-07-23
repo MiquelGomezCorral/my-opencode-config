@@ -1,7 +1,8 @@
 ---
 description: Bounded end-to-end and integration reviewer. Invoke for changes that affect public APIs/contracts, cross-package behavior, migrations, config/env/CLI shape, external integrations, or fixture contracts.
 mode: subagent
-model: openai/gpt-5.5
+model: openai/gpt-5.6-luna
+reasoningEffort: medium
 temperature: 0.1
 steps: 12
 permission:

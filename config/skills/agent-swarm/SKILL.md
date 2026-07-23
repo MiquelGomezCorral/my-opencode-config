@@ -95,7 +95,7 @@ Do not paste large files or full transcripts when workers can read the source di
 1. Map dependencies before launching.
 2. Put independent `task` calls in one `multi_tool_use.parallel` call.
 3. Prefer foreground task calls inside the parallel wrapper when the next step needs every result.
-4. Use `background: true` only when useful parent work can continue; save returned task IDs and rely on completion notifications.
+4. Use `background: true` only when useful parent work can continue and rely on completion notifications.
 5. Do not poll with tools that are not available, and do not block the parent with sleep loops.
 6. Launch the next dependency wave only after required prior results are verified.
 
@@ -104,7 +104,7 @@ Send one short progress update before a substantial swarm: what roles are launch
 ## Collection and failure handling
 
 - Continue with successful workers when one non-critical worker fails.
-- Retry a transient failure once, preferably with the same task ID when resumption is supported.
+- Child sessions are not resumable after completion; launch a fresh task only when new evidence justifies a retry.
 - Do not retry structural failures unchanged. Narrow the task, correct the contract, or report the blocker.
 - Replace a failed critical worker with one narrower worker when its result is required.
 - Preserve partial evidence and identify missing coverage.
@@ -159,7 +159,7 @@ Verification: <checks or evidence>
 Disagreements/gaps: <only if material>
 ```
 
-The user should expect child sessions, faster completion for genuinely independent work, higher token usage than a single agent, and a useful partial result when non-critical workers fail.
+The user should expect temporary child sessions, faster completion for genuinely independent work, higher token usage than a single agent, and a useful partial result when non-critical workers fail. Child sessions are deleted after their results are captured.
 
 ## Source basis
 

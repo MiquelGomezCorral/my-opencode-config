@@ -2,6 +2,10 @@ import { tool } from "@opencode-ai/plugin"
 
 const FALLBACK_MODELS = ["openai/gpt-5.5", "opencode/big-pickle"]
 const ATTEMPT_TIMEOUT_MS = 10 * 60 * 1000
+const CLEANUP_BATCH_SIZE = 20
+const STALE_SESSION_AGE_MS = 60_000
+const SUBAGENT_TITLE = /\([^()]*@[^()]+ subagent\)(?: \(fork #\d+\))?$/
+const SUBAGENT_FORK = / \(fork #\d+\)$/
 
 function parseModel(value) {
   const separator = value.indexOf("/")
@@ -27,7 +31,76 @@ export default async ({ client, directory }, options = {}) => {
       ? options.attemptTimeoutMs
       : ATTEMPT_TIMEOUT_MS
   const sessionWaiters = new Map()
-  const activeSessions = new Set()
+
+  const deleteSession = async (sessionID, sessionDirectory = directory) => {
+    try {
+      requireData(
+        await client.session.delete({
+          path: { id: sessionID },
+          query: { directory: sessionDirectory },
+          signal: AbortSignal.timeout(5_000),
+        }),
+        `Unable to delete subagent session ${sessionID}`,
+      )
+    } catch {
+      void client.app
+        .log({
+          body: {
+            service: "subagent-model-fallback",
+            level: "warn",
+            message: "Unable to delete subagent session",
+            extra: { sessionID },
+          },
+        })
+        .catch(() => {})
+    }
+  }
+
+  try {
+    const staleBefore = Date.now() - STALE_SESSION_AGE_MS
+    const sessions = requireData(
+      await client.session.list({
+        query: { directory, search: "subagent", limit: 10_000 },
+        signal: AbortSignal.timeout(5_000),
+      }),
+      "Unable to list existing sessions",
+    ).filter(
+      (session) =>
+        session.time.updated < staleBefore &&
+        SUBAGENT_TITLE.test(session.title) &&
+        (Boolean(session.parentID) || SUBAGENT_FORK.test(session.title)),
+    )
+    if (sessions.length) {
+      const statuses = requireData(
+        await client.session.status({
+          query: { directory },
+          signal: AbortSignal.timeout(5_000),
+        }),
+        "Unable to read existing session status",
+      )
+      const idleSessions = sessions.filter((session) => {
+        const status = statuses[session.id]?.type
+        return status !== "busy" && status !== "retry"
+      })
+      for (let index = 0; index < idleSessions.length; index += CLEANUP_BATCH_SIZE) {
+        await Promise.all(
+          idleSessions
+            .slice(index, index + CLEANUP_BATCH_SIZE)
+            .map((session) => deleteSession(session.id, session.directory)),
+        )
+      }
+    }
+  } catch {
+    void client.app
+      .log({
+        body: {
+          service: "subagent-model-fallback",
+          level: "warn",
+          message: "Unable to delete existing subagent sessions",
+        },
+      })
+      .catch(() => {})
+  }
 
   const watchSession = (sessionID, timeoutMs, signal, accept = () => true) => {
     let timer
@@ -108,12 +181,11 @@ export default async ({ client, directory }, options = {}) => {
     tool: {
       task: tool({
         description:
-          "Launch or resume an allowed subagent. By default, the selected or configured model runs first, then openai/gpt-5.5 and opencode/big-pickle. Pass models for an exact ordered chain with no implicit fallbacks.",
+          "Launch an allowed subagent. By default, the selected or configured model runs first, then openai/gpt-5.5 and opencode/big-pickle. Pass models for an exact ordered chain with no implicit fallbacks.",
         args: {
           description: tool.schema.string().describe("A short 3-5 word task description"),
           prompt: tool.schema.string().describe("The task for the subagent"),
           subagent_type: tool.schema.string().describe("The subagent to run"),
-          task_id: tool.schema.string().optional().describe("Existing child session ID to resume"),
           command: tool.schema.string().optional().describe("The command that triggered this task"),
           background: tool.schema
             .boolean()
@@ -180,83 +252,34 @@ export default async ({ client, directory }, options = {}) => {
           if (!agent.tools?.task) permission.push({ permission: "task", pattern: "*", action: "deny" })
 
           const firstModelName = formatModel(models[0])
-          const sourceSessionID = args.task_id
-          if (sourceSessionID) {
-            const resumed = requireData(
-              await client.session.get({
-                path: { id: args.task_id },
-                query: { directory: context.directory },
-                signal: AbortSignal.timeout(5_000),
-              }),
-              `Unable to read subagent session ${sourceSessionID}`,
-            )
-            if (
-              resumed.parentID !== context.sessionID ||
-              resumed.directory !== context.directory ||
-              resumed.agent !== agent.name
-            ) {
-              throw new Error(`Subagent session ${sourceSessionID} does not match this task`)
-            }
-            const statuses = requireData(
-              await client.session.status({
-                query: { directory: context.directory },
-                signal: AbortSignal.timeout(5_000),
-              }),
-              "Unable to read subagent status",
-            )
-            const status = statuses[sourceSessionID]
-            if (status?.type === "busy" || status?.type === "retry") {
-              throw new Error(`Subagent session ${sourceSessionID} is not idle`)
-            }
-            if (activeSessions.has(sourceSessionID)) {
-              throw new Error(`Subagent session ${sourceSessionID} is already running`)
-            }
-            activeSessions.add(sourceSessionID)
-          }
 
           const createAttempt = async (modelName) => {
-            const created = sourceSessionID
-              ? await client.session.fork({
-                  path: { id: sourceSessionID },
-                  query: { directory: context.directory },
-                })
-              : await client.session.create({
-                  body: {
-                    parentID: context.sessionID,
-                    title: `${args.description} (${modelName} @${agent.name} subagent)`,
-                    agent: agent.name,
-                    permission,
-                  },
-                  query: { directory: context.directory },
-                })
             return requireData(
-              created,
-              sourceSessionID
-                ? `Unable to fork subagent session ${sourceSessionID}`
-                : "Unable to create the subagent session",
+              await client.session.create({
+                body: {
+                  parentID: context.sessionID,
+                  title: `${args.description} (${modelName} @${agent.name} subagent)`,
+                  agent: agent.name,
+                  permission,
+                },
+                query: { directory: context.directory },
+              }),
+              "Unable to create the subagent session",
             ).id
           }
 
-          let firstSessionID
-          try {
-            firstSessionID = await createAttempt(firstModelName)
-          } catch (error) {
-            if (sourceSessionID) activeSessions.delete(sourceSessionID)
-            throw error
-          }
+          const firstSessionID = await createAttempt(firstModelName)
 
-          const render = (state, content, model, attemptedModels, sessionID, sessionIds) => ({
+          const render = (state, content, model, attemptedModels) => ({
             title: args.description,
             output: [
-              `<task id="${sessionID}" state="${state}">`,
+              `<task state="${state}">`,
               `<${state === "error" ? "task_error" : "task_result"}>`,
               content,
               `</${state === "error" ? "task_error" : "task_result"}>`,
               "</task>",
             ].join("\n"),
             metadata: {
-              sessionId: sessionID,
-              sessionIds,
               model,
               attemptedModels,
               ...(args.background ? { background: true } : {}),
@@ -393,31 +416,26 @@ export default async ({ client, directory }, options = {}) => {
 
           const run = async () => {
             const attemptedModels = []
-            const sessionIds = []
-            try {
-              for (const [index, model] of models.entries()) {
-                if (!args.background) context.abort.throwIfAborted()
-                const modelName = formatModel(model)
-                const sessionID = index === 0 ? firstSessionID : await createAttempt(modelName)
-                attemptedModels.push(modelName)
-                sessionIds.push(sessionID)
-                const output = await runAttempt(model, sessionID)
-                if (output) {
-                  return render("completed", output, modelName, attemptedModels, sessionID, sessionIds)
-                }
+            for (const [index, model] of models.entries()) {
+              if (!args.background) context.abort.throwIfAborted()
+              const modelName = formatModel(model)
+              const sessionID = index === 0 ? firstSessionID : await createAttempt(modelName)
+              attemptedModels.push(modelName)
+              let output
+              try {
+                output = await runAttempt(model, sessionID)
+              } finally {
+                await deleteSession(sessionID, context.directory)
               }
-
-              return render(
-                "error",
-                `All subagent models failed: ${attemptedModels.join(", ")}`,
-                undefined,
-                attemptedModels,
-                sessionIds.at(-1),
-                sessionIds,
-              )
-            } finally {
-              if (sourceSessionID) activeSessions.delete(sourceSessionID)
+              if (output) return render("completed", output, modelName, attemptedModels)
             }
+
+            return render(
+              "error",
+              `All subagent models failed: ${attemptedModels.join(", ")}`,
+              undefined,
+              attemptedModels,
+            )
           }
 
           const notifyParent = async (result) => {
@@ -474,7 +492,7 @@ export default async ({ client, directory }, options = {}) => {
           if (!args.background) {
             if (context.abort.aborted) {
               await abortChild(firstSessionID)
-              if (sourceSessionID) activeSessions.delete(sourceSessionID)
+              await deleteSession(firstSessionID, context.directory)
               context.abort.throwIfAborted()
             }
             return run()
@@ -487,8 +505,6 @@ export default async ({ client, directory }, options = {}) => {
                   error instanceof Error ? error.message : "Background subagent fallback failed",
                   undefined,
                   [],
-                  firstSessionID,
-                  [firstSessionID],
                 ),
               ),
             )
@@ -498,8 +514,6 @@ export default async ({ client, directory }, options = {}) => {
             "The task is running in the background. The parent session will be notified when it completes or all models fail.",
             firstModelName,
             [],
-            firstSessionID,
-            [firstSessionID],
           )
         },
       }),

@@ -18,17 +18,18 @@ const retry = Symbol("retry")
 async function setup(responses, options = {}) {
   const {
     attemptTimeoutMs = 50,
+    deleteError,
+    existingSessions = [],
+    existingStatuses = {},
     failMessageReadAt,
     parentActive = false,
     parentEvents = ["idle"],
     parentNotifications = [],
     parentStatusError,
-    resumedSession = {},
-    resumedStatus,
   } = options
   const calls = []
   const aborted = []
-  const forks = []
+  const deleted = []
   const parentEventsSent = []
   let parentNotificationCalls = 0
   let messageReads = 0
@@ -76,27 +77,16 @@ async function setup(responses, options = {}) {
       }),
     },
     session: {
-      get: async (request) => ({
-        data:
-          request.path.id === "parent-session"
-            ? { id: "parent-session", permission: [] }
-            : {
-                id: request.path.id,
-                parentID: "parent-session",
-                directory: "/tmp/project",
-                agent: "explore",
-                ...resumedSession,
-              },
-      }),
+      list: async () => ({ data: existingSessions }),
+      get: async () => ({ data: { id: "parent-session", permission: [] } }),
       create: async () => ({ data: { id: `child-${++child}` } }),
-      fork: async (request) => {
-        const sessionID = `child-${++child}`
-        forks.push(request.path.id)
-        messages.set(sessionID, [...(messages.get(request.path.id) ?? [])])
-        return { data: { id: sessionID } }
-      },
       abort: async (request) => {
         aborted.push(request.path.id)
+        return { data: true }
+      },
+      delete: async (request) => {
+        deleted.push(request.path.id)
+        if (deleteError) return { error: deleteError }
         return { data: true }
       },
       messages: async (request) => {
@@ -130,8 +120,8 @@ async function setup(responses, options = {}) {
         if (parentStatusError) return { error: parentStatusError }
         return {
           data: {
+            ...existingStatuses,
             ...(parentActive ? { "parent-session": { type: "busy" } } : {}),
-            ...(resumedStatus ? { "existing-session": { type: resumedStatus } } : {}),
           },
         }
       },
@@ -214,8 +204,8 @@ async function setup(responses, options = {}) {
     calls,
     context,
     controller,
+    deleted,
     emitEvent,
-    forks,
     messages,
     notified,
     get parentNotificationCalls() {
@@ -233,8 +223,59 @@ const args = {
 }
 
 describe("force subagent model", () => {
+  test("deletes existing idle subagent sessions", async () => {
+    const { deleted } = await setup([], {
+      existingSessions: [
+        {
+          id: "old-child",
+          directory: "/tmp/project",
+          parentID: "parent-session",
+          title: "Inspect code (opencode/model @explore subagent)",
+          time: { updated: 0 },
+        },
+        {
+          id: "old-fork",
+          directory: "/tmp/project",
+          title: "Inspect code (opencode/model @explore subagent) (fork #2)",
+          time: { updated: 0 },
+        },
+        {
+          id: "active-child",
+          directory: "/tmp/project",
+          parentID: "parent-session",
+          title: "Inspect code (opencode/model @explore subagent)",
+          time: { updated: 0 },
+        },
+        {
+          id: "archived-child",
+          directory: "/tmp/project",
+          parentID: "parent-session",
+          title: "Inspect code (opencode/model @explore subagent)",
+          time: { archived: 1, updated: 0 },
+        },
+        {
+          id: "recent-child",
+          directory: "/tmp/project",
+          parentID: "parent-session",
+          title: "Inspect code (opencode/model @explore subagent)",
+          time: { updated: Date.now() },
+        },
+        {
+          id: "manual-root",
+          directory: "/tmp/project",
+          title: "Notes (foo @bar subagent)",
+          time: { updated: 0 },
+        },
+        { id: "regular", directory: "/tmp/project", title: "Regular chat", time: { updated: 0 } },
+      ],
+      existingStatuses: { "active-child": { type: "busy" } },
+    })
+
+    expect(deleted).toEqual(["old-child", "old-fork", "archived-child"])
+  })
+
   test("falls back from the configured model to OpenAI", async () => {
-    const { calls, context, task } = await setup([
+    const { calls, context, deleted, task } = await setup([
       sdkError({ name: "ProviderError" }),
       response("Recovered"),
     ])
@@ -243,8 +284,20 @@ describe("force subagent model", () => {
 
     expect(calls).toEqual(["opencode/deepseek-v4-pro", "openai/gpt-5.5"])
     expect(result.metadata.model).toBe("openai/gpt-5.5")
-    expect(result.metadata.sessionIds).toEqual(["child-1", "child-2"])
+    expect(result.metadata.sessionId).toBeUndefined()
     expect(result.output).toContain('state="completed"')
+    expect(result.output).not.toContain('id="')
+    expect(deleted).toEqual(["child-1", "child-2"])
+  })
+
+  test("does not discard results when deletion fails", async () => {
+    const { context, task } = await setup([response("Recovered")], {
+      deleteError: { name: "DeleteError" },
+    })
+
+    const result = await task.execute(args, context)
+
+    expect(result.output).toContain("Recovered")
   })
 
   test("uses an explicitly selected model first", async () => {
@@ -315,123 +368,8 @@ describe("force subagent model", () => {
     expect(result.metadata.model).toBe("openai/gpt-5.5")
   })
 
-  test("ignores output from a resumed session's earlier messages", async () => {
-    const { context, messages, task } = await setup([response("Current result")])
-    messages.set("existing-session", [
-      {
-        info: {
-          id: "old-message",
-          role: "assistant",
-          time: { created: 1 },
-          finish: "stop",
-        },
-        parts: [{ type: "text", text: "Stale result" }],
-      },
-    ])
-
-    const result = await task.execute({ ...args, task_id: "existing-session" }, context)
-
-    expect(result.metadata.sessionId).toBe("child-1")
-    expect(result.output).toContain("Current result")
-    expect(result.output).not.toContain("Stale result")
-  })
-
-  test("rejects concurrent runs on the same resumed session", async () => {
-    const { calls, context, task } = await setup(["hang", response("Recovered")], {
-      attemptTimeoutMs: 100,
-    })
-    const first = task.execute({ ...args, task_id: "existing-session" }, context)
-    while (calls.length === 0) await Promise.resolve()
-
-    const second = task.execute({ ...args, task_id: "existing-session" }, context)
-
-    await expect(second).rejects.toThrow("already running")
-    await first
-  })
-
-  test("rejects a resumed session that is still active", async () => {
-    const { context, task } = await setup([], { resumedStatus: "retry" })
-
-    await expect(
-      task.execute({ ...args, task_id: "existing-session" }, context),
-    ).rejects.toThrow("is not idle")
-  })
-
-  test("rejects a resumed session from another parent", async () => {
-    const { context, task } = await setup([], {
-      resumedSession: { parentID: "another-parent" },
-    })
-
-    await expect(
-      task.execute({ ...args, task_id: "existing-session" }, context),
-    ).rejects.toThrow("does not match this task")
-  })
-
-  test("rejects a resumed session for another agent", async () => {
-    const { context, task } = await setup([], {
-      resumedSession: { agent: "general" },
-    })
-
-    await expect(
-      task.execute({ ...args, task_id: "existing-session" }, context),
-    ).rejects.toThrow("does not match this task")
-  })
-
-  test("forks the original context for every resumed fallback", async () => {
-    const { calls, context, forks, messages, task } = await setup([
-      response(undefined, { name: "ProviderError" }),
-      response("Recovered"),
-    ])
-    messages.set("existing-session", [
-      {
-        info: {
-          id: "old-message",
-          role: "assistant",
-          time: { created: 1 },
-          finish: "stop",
-        },
-        parts: [{ type: "text", text: "Prior context" }],
-      },
-    ])
-
-    const result = await task.execute({ ...args, task_id: "existing-session" }, context)
-
-    expect(calls).toEqual(["opencode/deepseek-v4-pro", "openai/gpt-5.5"])
-    expect(forks).toEqual(["existing-session", "existing-session"])
-    expect(messages.get("child-2")[0].parts[0].text).toBe("Prior context")
-    expect(result.output).toContain("Recovered")
-  })
-
-  test("ignores source-session events after forking a resume", async () => {
-    const { calls, context, emitEvent, messages, task } = await setup(["hang"], {
-      attemptTimeoutMs: 100,
-    })
-    const running = task.execute({ ...args, task_id: "existing-session" }, context)
-    while (calls.length === 0) await Promise.resolve()
-
-    await emitEvent({ type: "session.error", properties: { sessionID: "existing-session" } })
-    expect(calls).toEqual(["opencode/deepseek-v4-pro"])
-
-    messages.set("child-1", [
-      {
-        info: {
-          id: "current-message",
-          role: "assistant",
-          agent: "explore",
-          time: { created: Date.now() },
-          finish: "stop",
-        },
-        parts: [{ type: "text", text: "Current result" }],
-      },
-    ])
-    await emitEvent({ type: "session.idle", properties: { sessionID: "child-1" } })
-
-    const result = await running
-    expect(result.output).toContain("Current result")
-  })
-
   test("cancels foreground children without starting fallbacks", async () => {
-    const { aborted, calls, context, controller, task } = await setup(["hang"], {
+    const { aborted, calls, context, controller, deleted, task } = await setup(["hang"], {
       attemptTimeoutMs: 1_000,
     })
     const running = task.execute(args, context)
@@ -441,31 +379,18 @@ describe("force subagent model", () => {
 
     await expect(running).rejects.toThrow("cancelled by user")
     expect(aborted).toEqual(["child-1"])
+    expect(deleted).toEqual(["child-1"])
     expect(calls).toEqual(["opencode/deepseek-v4-pro"])
   })
 
   test("aborts a child when cancelled before its prompt starts", async () => {
-    const { aborted, calls, context, controller, task } = await setup([])
+    const { aborted, calls, context, controller, deleted, task } = await setup([])
     controller.abort(new Error("cancelled by user"))
 
     await expect(task.execute(args, context)).rejects.toThrow("cancelled by user")
     expect(aborted).toEqual(["child-1"])
+    expect(deleted).toEqual(["child-1"])
     expect(calls).toEqual([])
-  })
-
-  test("releases a resumed session cancelled before its prompt starts", async () => {
-    const { aborted, context, controller, forks, task } = await setup([response("Recovered")])
-    controller.abort(new Error("cancelled by user"))
-
-    await expect(task.execute({ ...args, task_id: "existing-session" }, context)).rejects.toThrow(
-      "cancelled by user",
-    )
-    context.abort = new AbortController().signal
-    const result = await task.execute({ ...args, task_id: "existing-session" }, context)
-
-    expect(aborted).toEqual(["child-1"])
-    expect(forks).toEqual(["existing-session", "existing-session"])
-    expect(result.output).toContain("Recovered")
   })
 
   test("reports an error after every model fails", async () => {
@@ -487,7 +412,7 @@ describe("force subagent model", () => {
   })
 
   test("times out a hanging model and notifies background parents", async () => {
-    const { aborted, calls, context, notified, parentEventsSent, task } = await setup(
+    const { aborted, calls, context, deleted, notified, parentEventsSent, task } = await setup(
       ["hang", response("Recovered")],
       {
         attemptTimeoutMs: 5,
@@ -502,6 +427,7 @@ describe("force subagent model", () => {
     expect(started.output).toContain('state="running"')
     expect(calls).toEqual(["opencode/deepseek-v4-pro", "openai/gpt-5.5"])
     expect(aborted).toEqual(["child-1"])
+    expect(deleted).toEqual(["child-1", "child-2"])
     expect(parentEventsSent).toEqual(["retry", "idle"])
     expect(notification.body.parts[0].text).toContain('state="completed"')
   })

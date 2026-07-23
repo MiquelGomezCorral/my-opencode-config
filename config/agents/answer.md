@@ -1,7 +1,8 @@
 ---
 description: "General-purpose Q&A — answers questions directly, no planning or code changes"
 mode: primary
-model: openai/gpt-5.5
+model: openai/gpt-5.6-luna
+reasoningEffort: high
 permission:
   task: deny
   todowrite: deny

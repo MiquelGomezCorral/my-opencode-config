@@ -292,6 +292,10 @@
       "type": "remote",
       "url": "https://staging.vidext.com/api/mcp/operator",
       "enabled": true
+    },
+    "vidext-operator-local": {
+      "type": "remote",
+      "url": "http://localhost:3000/api/mcp/operator"
     }
   },
   "experimental": { "mcp_timeout": 60000 }
