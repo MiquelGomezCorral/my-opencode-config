@@ -61,7 +61,6 @@ task({
 
 - Success reports `state="completed"`, the model used, and attempted models.
 - Exhausted default or exact chains report `state="error"` to the parent instead of hanging.
-- Background tasks wait until the parent is ready, then inject the same completed or error result.
 - Terminal child sessions are deleted so they do not accumulate in chat lists.
 
 The tool preserves the caller's `task` permission check and parent deny/external-directory rules. `answer` cannot use it. `code-reviewer` can use it only for its allowed reviewer subagents.

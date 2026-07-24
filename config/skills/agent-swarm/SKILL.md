@@ -95,9 +95,8 @@ Do not paste large files or full transcripts when workers can read the source di
 1. Map dependencies before launching.
 2. Put independent `task` calls in one `multi_tool_use.parallel` call.
 3. Prefer foreground task calls inside the parallel wrapper when the next step needs every result.
-4. Use `background: true` only when useful parent work can continue and rely on completion notifications.
-5. Do not poll with tools that are not available, and do not block the parent with sleep loops.
-6. Launch the next dependency wave only after required prior results are verified.
+4. Do not poll with tools that are not available, and do not block the parent with sleep loops.
+5. Launch the next dependency wave only after required prior results are verified.
 
 Send one short progress update before a substantial swarm: what roles are launching and why parallelism helps. Do not narrate every worker action.
 

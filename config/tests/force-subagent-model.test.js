@@ -18,29 +18,22 @@ const retry = Symbol("retry")
 async function setup(responses, options = {}) {
   const {
     attemptTimeoutMs = 50,
+    connect = true,
     deleteError,
     existingSessions = [],
     existingStatuses = {},
     failMessageReadAt,
-    parentActive = false,
-    parentEvents = ["idle"],
-    parentNotifications = [],
-    parentStatusError,
+    listFailures = 0,
   } = options
   const calls = []
   const aborted = []
   const deleted = []
-  const parentEventsSent = []
-  let parentNotificationCalls = 0
   let messageReads = 0
   const messages = new Map()
   const eventQueue = []
   let child = 0
+  let listCalls = 0
   let receiveEvent
-  let notify
-  const notified = new Promise((resolve) => {
-    notify = resolve
-  })
   const emitEvent = (event) =>
     new Promise((resolve) => {
       const queued = { event, resolve }
@@ -77,7 +70,10 @@ async function setup(responses, options = {}) {
       }),
     },
     session: {
-      list: async () => ({ data: existingSessions }),
+      list: async () => {
+        if (listCalls++ < listFailures) return { error: { name: "ListError" } }
+        return { data: existingSessions }
+      },
       get: async () => ({ data: { id: "parent-session", permission: [] } }),
       create: async () => ({ data: { id: `child-${++child}` } }),
       abort: async (request) => {
@@ -96,44 +92,8 @@ async function setup(responses, options = {}) {
         }
         return { data: messages.get(request.path.id) ?? [] }
       },
-      status: async () => {
-        if (parentActive) {
-          queueMicrotask(() => {
-            void (async () => {
-              for (const type of parentEvents) {
-                const event =
-                  type === "retry"
-                    ? {
-                        type: "session.status",
-                        properties: {
-                          sessionID: "parent-session",
-                          status: { type: "retry", attempt: 1 },
-                        },
-                      }
-                    : { type: `session.${type}`, properties: { sessionID: "parent-session" } }
-                await emitEvent(event)
-                parentEventsSent.push(type)
-              }
-            })()
-          })
-        }
-        if (parentStatusError) return { error: parentStatusError }
-        return {
-          data: {
-            ...existingStatuses,
-            ...(parentActive ? { "parent-session": { type: "busy" } } : {}),
-          },
-        }
-      },
+      status: async () => ({ data: existingStatuses }),
       promptAsync: async (request) => {
-        if (request.path.id === "parent-session") {
-          parentNotificationCalls++
-          const next = parentNotifications.shift()
-          if (next?.error) return { error: next.error }
-          notify(request)
-          return { data: undefined }
-        }
-
         const sessionID = request.path.id
         calls.push(`${request.body.model.providerID}/${request.body.model.modelID}`)
         const next = responses.shift()
@@ -190,6 +150,9 @@ async function setup(responses, options = {}) {
     },
   }
   const plugin = await forceSubagentModel({ client, directory: "/tmp/project" }, { attemptTimeoutMs })
+  if (connect) {
+    await plugin.event({ event: { type: "server.connected", properties: {} } })
+  }
   const controller = new AbortController()
   const context = {
     abort: controller.signal,
@@ -206,12 +169,8 @@ async function setup(responses, options = {}) {
     controller,
     deleted,
     emitEvent,
+    handleEvent: plugin.event,
     messages,
-    notified,
-    get parentNotificationCalls() {
-      return parentNotificationCalls
-    },
-    parentEventsSent,
     task: plugin.tool.task,
   }
 }
@@ -223,8 +182,9 @@ const args = {
 }
 
 describe("force subagent model", () => {
-  test("deletes existing idle subagent sessions", async () => {
-    const { deleted } = await setup([], {
+  test("deletes existing idle subagent sessions after session activity starts", async () => {
+    const { deleted, handleEvent } = await setup([], {
+      connect: false,
       existingSessions: [
         {
           id: "old-child",
@@ -271,7 +231,46 @@ describe("force subagent model", () => {
       existingStatuses: { "active-child": { type: "busy" } },
     })
 
+    expect(deleted).toEqual([])
+    await handleEvent({ event: { type: "server.connected", properties: {} } })
+    expect(deleted).toEqual([])
+    await handleEvent({
+      event: { type: "session.created", properties: { info: { id: "new-session" } } },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
     expect(deleted).toEqual(["old-child", "old-fork", "archived-child"])
+  })
+
+  test("does not expose background task mode", async () => {
+    const { task } = await setup([])
+
+    expect(task.args.background).toBeUndefined()
+  })
+
+  test("retries stale cleanup once after a transient failure", async () => {
+    const { deleted, handleEvent } = await setup([], {
+      connect: false,
+      existingSessions: [
+        {
+          id: "old-child",
+          directory: "/tmp/project",
+          parentID: "parent-session",
+          title: "Inspect code (opencode/model @explore subagent)",
+          time: { updated: 0 },
+        },
+      ],
+      listFailures: 1,
+    })
+
+    await handleEvent({
+      event: { type: "session.created", properties: { info: { id: "new-session" } } },
+    })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(deleted).toEqual([])
+
+    await handleEvent({ event: { type: "server.heartbeat", properties: {} } })
+    await new Promise((resolve) => setTimeout(resolve, 0))
+    expect(deleted).toEqual(["old-child"])
   })
 
   test("falls back from the configured model to OpenAI", async () => {
@@ -409,65 +408,6 @@ describe("force subagent model", () => {
     ])
     expect(result.output).toContain('state="error"')
     expect(result.metadata.attemptedModels).toEqual(calls)
-  })
-
-  test("times out a hanging model and notifies background parents", async () => {
-    const { aborted, calls, context, deleted, notified, parentEventsSent, task } = await setup(
-      ["hang", response("Recovered")],
-      {
-        attemptTimeoutMs: 5,
-        parentActive: true,
-        parentEvents: ["retry", "idle"],
-      },
-    )
-
-    const started = await task.execute({ ...args, background: true }, context)
-    const notification = await notified
-
-    expect(started.output).toContain('state="running"')
-    expect(calls).toEqual(["opencode/deepseek-v4-pro", "openai/gpt-5.5"])
-    expect(aborted).toEqual(["child-1"])
-    expect(deleted).toEqual(["child-1", "child-2"])
-    expect(parentEventsSent).toEqual(["retry", "idle"])
-    expect(notification.body.parts[0].text).toContain('state="completed"')
-  })
-
-  test("notifies after parent readiness timeout", async () => {
-    const { context, notified, parentEventsSent, task } = await setup(
-      [response("Recovered")],
-      { attemptTimeoutMs: 5, parentActive: true, parentEvents: ["retry"] },
-    )
-
-    await task.execute({ ...args, background: true }, context)
-    const notification = await notified
-
-    expect(parentEventsSent).toEqual(["retry"])
-    expect(notification.body.parts[0].text).toContain('state="completed"')
-  })
-
-  test("waits for parent readiness when its status cannot be read", async () => {
-    const { context, notified, parentEventsSent, task } = await setup([response("Recovered")], {
-      parentActive: true,
-      parentStatusError: { name: "StatusError" },
-    })
-
-    await task.execute({ ...args, background: true }, context)
-    const notification = await notified
-
-    expect(parentEventsSent).toEqual(["idle"])
-    expect(notification.body.parts[0].text).toContain('state="completed"')
-  })
-
-  test("retries rejected background notifications", async () => {
-    const setupResult = await setup([response("Recovered")], {
-      parentNotifications: [{ error: { name: "Busy" } }],
-    })
-
-    await setupResult.task.execute({ ...args, background: true }, setupResult.context)
-    const notification = await setupResult.notified
-
-    expect(setupResult.parentNotificationCalls).toBe(2)
-    expect(notification.body.parts[0].text).toContain('state="completed"')
   })
 
   test("reports message-read failures instead of consuming fallbacks", async () => {

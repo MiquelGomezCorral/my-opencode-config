@@ -3,6 +3,7 @@ import { tool } from "@opencode-ai/plugin"
 const FALLBACK_MODELS = ["openai/gpt-5.5", "opencode/big-pickle"]
 const ATTEMPT_TIMEOUT_MS = 10 * 60 * 1000
 const CLEANUP_BATCH_SIZE = 20
+const CLEANUP_ATTEMPTS = 2
 const STALE_SESSION_AGE_MS = 60_000
 const SUBAGENT_TITLE = /\([^()]*@[^()]+ subagent\)(?: \(fork #\d+\))?$/
 const SUBAGENT_FORK = / \(fork #\d+\)$/
@@ -21,8 +22,7 @@ function requireData(result, message) {
 }
 
 function timeoutSignal(signal) {
-  const timeout = AbortSignal.timeout(5_000)
-  return signal ? AbortSignal.any([signal, timeout]) : timeout
+  return AbortSignal.any([signal, AbortSignal.timeout(5_000)])
 }
 
 export default async ({ client, directory }, options = {}) => {
@@ -42,6 +42,7 @@ export default async ({ client, directory }, options = {}) => {
         }),
         `Unable to delete subagent session ${sessionID}`,
       )
+      return true
     } catch {
       void client.app
         .log({
@@ -53,53 +54,62 @@ export default async ({ client, directory }, options = {}) => {
           },
         })
         .catch(() => {})
+      return false
     }
   }
 
-  try {
-    const staleBefore = Date.now() - STALE_SESSION_AGE_MS
-    const sessions = requireData(
-      await client.session.list({
-        query: { directory, search: "subagent", limit: 10_000 },
-        signal: AbortSignal.timeout(5_000),
-      }),
-      "Unable to list existing sessions",
-    ).filter(
-      (session) =>
-        session.time.updated < staleBefore &&
-        SUBAGENT_TITLE.test(session.title) &&
-        (Boolean(session.parentID) || SUBAGENT_FORK.test(session.title)),
-    )
-    if (sessions.length) {
-      const statuses = requireData(
-        await client.session.status({
-          query: { directory },
+  let cleanupScheduled = false
+  let cleanupAttempts = 0
+  const cleanupStaleSessions = async () => {
+    try {
+      const staleBefore = Date.now() - STALE_SESSION_AGE_MS
+      const sessions = requireData(
+        await client.session.list({
+          query: { directory, search: "subagent", limit: 10_000 },
           signal: AbortSignal.timeout(5_000),
         }),
-        "Unable to read existing session status",
+        "Unable to list existing sessions",
+      ).filter(
+        (session) =>
+          session.time.updated < staleBefore &&
+          SUBAGENT_TITLE.test(session.title) &&
+          (Boolean(session.parentID) || SUBAGENT_FORK.test(session.title)),
       )
-      const idleSessions = sessions.filter((session) => {
-        const status = statuses[session.id]?.type
-        return status !== "busy" && status !== "retry"
-      })
-      for (let index = 0; index < idleSessions.length; index += CLEANUP_BATCH_SIZE) {
-        await Promise.all(
-          idleSessions
-            .slice(index, index + CLEANUP_BATCH_SIZE)
-            .map((session) => deleteSession(session.id, session.directory)),
+      if (sessions.length) {
+        let deletionFailed = false
+        const statuses = requireData(
+          await client.session.status({
+            query: { directory },
+            signal: AbortSignal.timeout(5_000),
+          }),
+          "Unable to read existing session status",
         )
+        const idleSessions = sessions.filter((session) => {
+          const status = statuses[session.id]?.type
+          return status !== "busy" && status !== "retry"
+        })
+        for (let index = 0; index < idleSessions.length; index += CLEANUP_BATCH_SIZE) {
+          const deleted = await Promise.all(
+            idleSessions
+              .slice(index, index + CLEANUP_BATCH_SIZE)
+              .map((session) => deleteSession(session.id, session.directory)),
+          )
+          if (deleted.includes(false)) deletionFailed = true
+        }
+        if (deletionFailed) cleanupScheduled = false
       }
+    } catch {
+      cleanupScheduled = false
+      void client.app
+        .log({
+          body: {
+            service: "subagent-model-fallback",
+            level: "warn",
+            message: "Unable to delete existing subagent sessions",
+          },
+        })
+        .catch(() => {})
     }
-  } catch {
-    void client.app
-      .log({
-        body: {
-          service: "subagent-model-fallback",
-          level: "warn",
-          message: "Unable to delete existing subagent sessions",
-        },
-      })
-      .catch(() => {})
   }
 
   const watchSession = (sessionID, timeoutMs, signal, accept = () => true) => {
@@ -108,7 +118,7 @@ export default async ({ client, directory }, options = {}) => {
     let onAbort
     const cleanup = () => {
       clearTimeout(timer)
-      if (onAbort) signal.removeEventListener("abort", onAbort)
+      signal.removeEventListener("abort", onAbort)
       const waiters = sessionWaiters.get(sessionID)
       waiters?.delete(waiter)
       if (waiters?.size === 0) sessionWaiters.delete(sessionID)
@@ -123,11 +133,9 @@ export default async ({ client, directory }, options = {}) => {
       waiters.add(waiter)
       sessionWaiters.set(sessionID, waiters)
       timer = setTimeout(() => waiter({ type: "timeout" }), timeoutMs)
-      if (signal) {
-        onAbort = () => waiter({ type: "aborted" })
-        if (signal.aborted) onAbort()
-        else signal.addEventListener("abort", onAbort, { once: true })
-      }
+      onAbort = () => waiter({ type: "aborted" })
+      if (signal.aborted) onAbort()
+      else signal.addEventListener("abort", onAbort, { once: true })
     })
     return { promise, cancel: cleanup }
   }
@@ -137,6 +145,20 @@ export default async ({ client, directory }, options = {}) => {
   }
 
   const handleSessionEvent = (event) => {
+    if (event.type === "server.connected") return
+    if (
+      !cleanupScheduled &&
+      cleanupAttempts < CLEANUP_ATTEMPTS &&
+      (event.type === "server.heartbeat" ||
+        event.type.startsWith("session.") ||
+        event.properties?.sessionID ||
+        event.properties?.info?.sessionID)
+    ) {
+      cleanupScheduled = true
+      cleanupAttempts++
+      setTimeout(() => void cleanupStaleSessions(), 0)
+    }
+
     if (event.type === "message.updated") {
       const info = event.properties?.info
       if (info?.role === "assistant" && info.error) {
@@ -187,10 +209,6 @@ export default async ({ client, directory }, options = {}) => {
           prompt: tool.schema.string().describe("The task for the subagent"),
           subagent_type: tool.schema.string().describe("The subagent to run"),
           command: tool.schema.string().optional().describe("The command that triggered this task"),
-          background: tool.schema
-            .boolean()
-            .optional()
-            .describe("Run in the background and notify the parent session when complete"),
           model: tool.schema
             .string()
             .optional()
@@ -282,7 +300,6 @@ export default async ({ client, directory }, options = {}) => {
             metadata: {
               model,
               attemptedModels,
-              ...(args.background ? { background: true } : {}),
             },
           })
 
@@ -326,9 +343,9 @@ export default async ({ client, directory }, options = {}) => {
           }
 
           const runAttempt = async (model, sessionID) => {
-            const signal = args.background ? undefined : context.abort
+            const signal = context.abort
             const stopIfAborted = async () => {
-              if (!signal?.aborted) return
+              if (!signal.aborted) return
               await abortChild(sessionID)
               signal.throwIfAborted()
             }
@@ -344,7 +361,7 @@ export default async ({ client, directory }, options = {}) => {
                 `Unable to inspect subagent session ${sessionID}`,
               )
             } catch (error) {
-              if (signal?.aborted) await stopIfAborted()
+              if (signal.aborted) await stopIfAborted()
               await abortChild(sessionID)
               throw error
             }
@@ -370,7 +387,7 @@ export default async ({ client, directory }, options = {}) => {
             } catch {
               watcher.cancel()
               await abortChild(sessionID)
-              if (!args.background && context.abort.aborted) context.abort.throwIfAborted()
+              if (context.abort.aborted) context.abort.throwIfAborted()
               return
             }
 
@@ -397,11 +414,11 @@ export default async ({ client, directory }, options = {}) => {
                 read = await readOutput(sessionID, existingMessages, signal)
               } catch (error) {
                 nextWatcher.cancel()
-                if (signal?.aborted) await stopIfAborted()
+                if (signal.aborted) await stopIfAborted()
                 await abortChild(sessionID)
                 throw error
               }
-              if (signal?.aborted) {
+              if (signal.aborted) {
                 nextWatcher.cancel()
                 await stopIfAborted()
               }
@@ -417,7 +434,7 @@ export default async ({ client, directory }, options = {}) => {
           const run = async () => {
             const attemptedModels = []
             for (const [index, model] of models.entries()) {
-              if (!args.background) context.abort.throwIfAborted()
+              context.abort.throwIfAborted()
               const modelName = formatModel(model)
               const sessionID = index === 0 ? firstSessionID : await createAttempt(modelName)
               attemptedModels.push(modelName)
@@ -438,83 +455,12 @@ export default async ({ client, directory }, options = {}) => {
             )
           }
 
-          const notifyParent = async (result) => {
-            const parentWatcher = watchSession(
-              context.sessionID,
-              attemptTimeoutMs,
-              undefined,
-              (event) => event.type === "idle" || event.type === "error",
-            )
-            let parentReady = false
-            try {
-              const status = requireData(
-                await client.session.status({
-                  query: { directory: context.directory },
-                  signal: AbortSignal.timeout(5_000),
-                }),
-                "Unable to read parent session status",
-              )[context.sessionID]
-              parentReady = status?.type !== "busy" && status?.type !== "retry"
-            } catch {}
-            if (parentReady) parentWatcher.cancel()
-            else await parentWatcher.promise
-
-            for (let attempt = 0; attempt < 2; attempt++) {
-              try {
-                const notified = await client.session.promptAsync({
-                  path: { id: context.sessionID },
-                  query: { directory: context.directory },
-                  body: {
-                    agent: context.agent,
-                    parts: [{ type: "text", text: result.output }],
-                  },
-                  signal: AbortSignal.timeout(5_000),
-                })
-                if (notified.error) throw new Error("Parent notification was rejected", { cause: notified.error })
-                return
-              } catch {
-                if (attempt === 0) await new Promise((resolve) => setTimeout(resolve, 500))
-              }
-            }
-
-            await client.app
-              .log({
-                body: {
-                  service: "subagent-model-fallback",
-                  level: "error",
-                  message: "Unable to notify parent session of subagent completion",
-                  extra: { parentSessionID: context.sessionID },
-                },
-              })
-              .catch(() => {})
+          if (context.abort.aborted) {
+            await abortChild(firstSessionID)
+            await deleteSession(firstSessionID, context.directory)
+            context.abort.throwIfAborted()
           }
-
-          if (!args.background) {
-            if (context.abort.aborted) {
-              await abortChild(firstSessionID)
-              await deleteSession(firstSessionID, context.directory)
-              context.abort.throwIfAborted()
-            }
-            return run()
-          }
-
-          void run().then(notifyParent, (error) =>
-              notifyParent(
-                render(
-                  "error",
-                  error instanceof Error ? error.message : "Background subagent fallback failed",
-                  undefined,
-                  [],
-                ),
-              ),
-            )
-
-          return render(
-            "running",
-            "The task is running in the background. The parent session will be notified when it completes or all models fail.",
-            firstModelName,
-            [],
-          )
+          return run()
         },
       }),
     },
